@@ -24,6 +24,10 @@ public enum ErrorCode {
     TOKEN_GENERATION_FAILED(1015, "Token generation failed", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_REFRESH_TOKEN(1016, "Invalid refresh token", HttpStatus.UNAUTHORIZED),
     TOKEN_REVOCATION_FAILED(1017, "Token revocation failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    USERNAME_ALREADY_EXISTS(1018, "Username already exists", HttpStatus.BAD_REQUEST),
+    EMAIL_ALREADY_EXISTS(1019, "Email already exists", HttpStatus.BAD_REQUEST),
+    INVALID_PASSWORD(1020, "Invalid current password", HttpStatus.BAD_REQUEST),
+    PASSWORD_MISMATCH(1021, "Password confirmation does not match", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;

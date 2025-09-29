@@ -168,7 +168,6 @@ public class AuthServiceImpl implements AuthService {
                     .claim("username", user.getUsername())
                     .claim("email", user.getEmail())
                     .claim("role", user.getRole().name())
-                    .claim("status", user.getStatus().name())
                     .build();
 
             JwsHeader jwsHeader = JwsHeader.with(SecurityConfig.JWT_ALGORITHM).build();

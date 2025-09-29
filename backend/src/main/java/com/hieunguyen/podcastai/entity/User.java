@@ -3,9 +3,6 @@ package com.hieunguyen.podcastai.entity;
 import com.hieunguyen.podcastai.entity.base.AuditableEntity;
 import com.hieunguyen.podcastai.enums.UserRole;
 import com.hieunguyen.podcastai.enums.UserStatus;
-import com.hieunguyen.podcastai.entity.Playlist;
-import com.hieunguyen.podcastai.entity.UserFavorite;
-import com.hieunguyen.podcastai.entity.Podcast;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -15,6 +15,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
@@ -22,6 +24,8 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
+
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,6 +34,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class SecurityConfig {
+
+    private final CustomAuthenticationEntryPoint authenticationEntryPoint;
 
     @Value("${app.jwt.secret-key}")
     private String jwtSecretKey;
@@ -48,9 +54,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(publicEndpoints).permitAll()
                 .anyRequest().authenticated()
-            )
+            )   
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(Customizer.withDefaults())
+                .jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                )
+                .authenticationEntryPoint(authenticationEntryPoint)  // ← Custom entry point
+            )
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(authenticationEntryPoint)  // ← Global entry point
+                // .accessDeniedHandler(accessDeniedHandler)            // ← Access denied handler
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
@@ -75,5 +88,16 @@ public class SecurityConfig {
     @Bean
     public JwtEncoder jwtEncoder() {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey.getBytes()));
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("role");
+        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return converter;
     }
 }
