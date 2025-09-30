@@ -19,7 +19,6 @@ public class SecurityUtils {
 
     private final UserRepository userRepository;
 
-
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
@@ -32,20 +31,33 @@ public class SecurityUtils {
         Object principal = authentication.getPrincipal();
         
         if (principal instanceof Jwt jwt) {
+            // Try to get user by email first
             String email = jwt.getClaimAsString("email");
-            if (email == null) {
-                log.error("Email not found in JWT token");
-                throw new AppException(ErrorCode.UNAUTHORIZED);
+            if (email != null) {
+                User user = userRepository.findByEmail(email).orElse(null);
+                if (user != null) {
+                    log.debug("Current user retrieved from JWT email: {}", user.getEmail());
+                    return user;
+                }
+                log.warn("User not found with email from JWT: {}, trying fallback method", email);
             }
             
-            User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> {
-                    log.error("User not found with email from JWT: {}", email);
-                    return new AppException(ErrorCode.USER_NOT_FOUND);
-                });
-            
-            log.debug("Current user retrieved from JWT: {}", user.getEmail());
-            return user;
+            // Fallback: Try to get user by user ID from JWT subject
+            String subject = jwt.getSubject();
+            if (subject != null) {
+                try {
+                    Long userId = Long.parseLong(subject);
+                    User user = userRepository.findById(userId).orElse(null);
+                    if (user != null) {
+                        log.debug("Current user retrieved from JWT subject (user ID): {}", user.getEmail());
+                        return user;
+                    }
+                    log.warn("User not found with ID from JWT subject: {}", userId);
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid user ID format in JWT subject: {}", subject);
+                }
+            }
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
         }
         
         log.error("Principal is not of type Jwt: {}", principal.getClass().getName());
@@ -69,7 +81,6 @@ public class SecurityUtils {
                && authentication.getPrincipal() instanceof Jwt;
     }
     
-
     public User getCurrentUserSafely() {
         try {
             return getCurrentUser();

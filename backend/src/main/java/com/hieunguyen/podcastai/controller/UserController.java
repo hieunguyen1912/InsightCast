@@ -55,7 +55,16 @@ public class UserController {
         log.info("Updating user profile");
         UserDto userDto = userService.updateProfile(request);
         log.info("Successfully updated user profile for user: {}", userDto.getEmail());
-        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", userDto));
+        
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok();
+        
+
+        if (request.getEmail() != null && !request.getEmail().equals(userDto.getEmail())) {
+            responseBuilder.header("X-Token-Refresh-Required", "true");
+            responseBuilder.header("X-Token-Refresh-Reason", "email-changed");
+        }
+        
+        return responseBuilder.body(ApiResponse.success("Profile updated successfully", userDto));
     }
 
     @PutMapping("/me/password")

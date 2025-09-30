@@ -91,7 +91,4 @@ public class Podcast extends AuditableEntity {
     )
     private List<Tag> tags = new ArrayList<>();
     
-    // @OneToMany(mappedBy = "podcast", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    // private List<PodcastGeneration> generations = new ArrayList<>();
-    
 }
