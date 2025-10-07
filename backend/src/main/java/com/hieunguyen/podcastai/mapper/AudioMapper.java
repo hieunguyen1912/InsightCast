@@ -39,7 +39,6 @@ public interface AudioMapper {
     /**
      * Convert AudioFile entity to AudioFileDto
      */
-    @Mapping(target = "playUrl", expression = "java(\"/api/v1/audio/\" + audioFile.getId() + \"/play\")")
     @Mapping(target = "downloadUrl", expression = "java(\"/api/v1/audio/\" + audioFile.getId() + \"/download\")")
     @Mapping(target = "streamUrl", expression = "java(\"/api/v1/audio/\" + audioFile.getId() + \"/stream\")")
     @Mapping(target = "user", source = "user", qualifiedByName = "mapUser")

@@ -34,7 +34,6 @@ public class AudioFileDto {
     private Instant updatedAt;
     
     // URLs for client access
-    private String playUrl;
     private String downloadUrl;
     private String streamUrl;
     
