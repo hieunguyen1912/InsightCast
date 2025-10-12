@@ -144,18 +144,15 @@ export const authService = {
     try {
       const response = await apiClient.post('/auth/refresh');
       
-      // Backend response structure: { status, code, message, data, timestamp }
-      // data contains: { tokens }
-      if (response.data && response.data.tokens) {
-        const { tokens } = response.data;
+      if (response.data && response.data.accessToken) {
+        const { accessToken, expiresIn } = response.data;
         
-        // Update access token in memory
-        if (tokens.accessToken) {
-          tokenManager.setToken(tokens.accessToken, tokens.expiresIn);
+        if (accessToken) {
+          tokenManager.setToken(accessToken, expiresIn);
         }
         
         return {
-          data: { tokens },
+          data: response.data,
           success: true
         };
       }
@@ -249,10 +246,7 @@ export const authService = {
     return userData ? JSON.parse(userData) : null;
   },
 
-  /**
-   * Check if user is authenticated
-   * @returns {boolean} Authentication status
-   */
+
   isAuthenticated() {
     return !!this.getToken();
   },
@@ -261,5 +255,9 @@ export const authService = {
     tokenManager.clearToken();
     
     localStorage.removeItem('userData');
-  }
+  },
+
+  setToken(token, expiresIn) {
+    tokenManager.setToken(token, expiresIn);
+  },
 };

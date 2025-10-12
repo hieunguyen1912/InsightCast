@@ -99,19 +99,34 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const token = authService.getToken();
+        const existingToken = authService.getToken();
         const user = authService.getUser();
         
-        if (token && user) {
-          // Verify token is still valid by fetching profile
-          const result = await authService.getProfile();
-          if (result.success) {
+        if (existingToken && user) {
+          // Verify existing token by fetching profile
+          const profileResult = await authService.getProfile();
+          if (profileResult.success) {
             dispatch({
               type: AUTH_ACTIONS.LOGIN_SUCCESS,
-              payload: { user: result.data }
+              payload: { user: profileResult.data }
+            });
+            return;
+          }
+        }
+
+        const refreshResult = await authService.refreshToken();
+        
+        if (refreshResult.success) {
+          
+          const profileResult = await authService.getProfile();
+          console.log('👤 Profile result:', profileResult);
+          
+          if (profileResult.success) {
+            dispatch({
+              type: AUTH_ACTIONS.LOGIN_SUCCESS,
+              payload: { user: profileResult.data }
             });
           } else {
-            // Token is invalid, clear auth
             authService.clearAuth();
             dispatch({ type: AUTH_ACTIONS.LOGOUT });
           }
@@ -119,7 +134,6 @@ export function AuthProvider({ children }) {
           dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
         dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
       }
     };
