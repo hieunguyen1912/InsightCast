@@ -38,7 +38,7 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         response.setCharacterEncoding("UTF-8");
         
         ApiResponse<Object> apiResponse = ApiResponse.error(
-            ErrorCode.UNAUTHORIZED.getStatusCode().value(),
+            ErrorCode.UNAUTHENTICATED.getStatusCode().value(),
             buildClientMessage(authException), 
             ErrorCode.UNAUTHORIZED.getCode()
         );

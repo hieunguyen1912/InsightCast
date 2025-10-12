@@ -43,6 +43,8 @@ public class AuthController {
                 .sameSite("Strict")
                 .build();
                 
+        response.getTokens().setRefreshToken(null);
+        
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
             .body(ApiResponse.success("Login successful", response));
@@ -69,6 +71,8 @@ public class AuthController {
                 .sameSite("Strict")
                 .build();
                 
+        response.setRefreshToken(null);
+        
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
             .body(ApiResponse.success("Token refreshed successfully", response));

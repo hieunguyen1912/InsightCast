@@ -18,6 +18,8 @@ import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.service.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
@@ -27,10 +29,12 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/user")
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "User Controller")
 public class UserController {
 
     private final UserService userService;
 
+    @Operation(summary = "Get current user profile")
     @GetMapping("/me")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<UserDto>> getMe() {

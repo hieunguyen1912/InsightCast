@@ -111,45 +111,35 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public UserLoginResponse login(UserLoginRequest request) {
         log.info("Starting user login for email: {}", request.getEmail());
+
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+            request.getEmail(),
+            request.getPassword()
+        );
+
+        Authentication authentication = authenticationManager.authenticate(authenticationToken);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        log.info("Authentication successful for email: {}", authentication.getName());
         
-        try {
-
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                request.getEmail(),
-                request.getPassword()
-            );
-
-            Authentication authentication = authenticationManager.authenticate(authenticationToken);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            log.info("Authentication successful for email: {}", authentication.getName());
-            
-            User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-            
-            // Generate JWT tokens (access + refresh)
-            TokenDto tokens = generateTokens(user);
-            
-            // Map user to DTO
-            UserDto userDto = userMapper.toDto(user);
-            
-            // Create response
-            UserLoginResponse response = UserLoginResponse.builder()
-                    .user(userDto)
-                    .tokens(tokens)
-                    .requiresEmailVerification(!user.getEmailVerified())
-                    .build();
-            
-            log.info("User login successful for ID: {}", user.getId());
-            return response;
-            
-        } catch (AppException e) {
-            log.error("Login failed: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Unexpected error during login for user: {}", request.getEmail(), e);
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
-        }
+        User user = userRepository.findByEmail(authentication.getName())
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        // Generate JWT tokens (access + refresh)
+        TokenDto tokens = generateTokens(user);
+        
+        // Map user to DTO
+        UserDto userDto = userMapper.toDto(user);
+        
+        // Create response
+        UserLoginResponse response = UserLoginResponse.builder()
+                .user(userDto)
+                .tokens(tokens)
+                .requiresEmailVerification(!user.getEmailVerified())
+                .build();
+        
+        log.info("User login successful for ID: {}", user.getId());
+        return response;
     }
 
     @Override
@@ -179,7 +169,6 @@ public class AuthServiceImpl implements AuthService {
                     .tokenType("Bearer")
                     .expiresIn(accessTokenExpirationMs)
                     .expiresAt(expiresAt)
-                    .scope("read write")
                     .build();
             
             log.info("Access token generated successfully for user ID: {}", user.getId());

@@ -16,10 +16,9 @@ import java.time.Instant;
 public class TokenDto {
     
     private String accessToken;
-    private String refreshToken;
+    private String refreshToken; // For internal use only, not sent to client
     @Builder.Default
     private String tokenType = "Bearer";
     private Long expiresIn;
     private Instant expiresAt;
-    private String scope;
 }
