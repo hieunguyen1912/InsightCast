@@ -1,5 +1,9 @@
 package com.hieunguyen.podcastai.controller;
 
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -9,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.hieunguyen.podcastai.dto.request.user.AvatarUploadRequest;
@@ -16,6 +21,7 @@ import com.hieunguyen.podcastai.dto.request.user.PasswordChangeRequest;
 import com.hieunguyen.podcastai.dto.request.user.UserUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.UserDto;
+import com.hieunguyen.podcastai.entity.User;
 import com.hieunguyen.podcastai.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -96,5 +102,12 @@ public class UserController {
         userService.deleteAccount();
         log.info("Successfully deleted account");
         return ResponseEntity.ok(ApiResponse.success("Account deleted successfully", null));
+    }
+
+    @GetMapping( "/advance-search-with-specification")
+    public ResponseEntity<ApiResponse<List<UserDto>>> search(Pageable pageable, @RequestParam(value = "search", required = false) String... search) {
+        Page<UserDto> users = userService.searchUserBySpecification(pageable, search);
+
+        return ResponseEntity.ok(ApiResponse.success("Users fetched successfully", users.getContent(), ApiResponse.PageInfo.from(users)));
     }
 }

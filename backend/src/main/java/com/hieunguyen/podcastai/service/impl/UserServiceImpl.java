@@ -10,11 +10,18 @@ import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.mapper.UserMapper;
 import com.hieunguyen.podcastai.repository.UserRepository;
 import com.hieunguyen.podcastai.service.UserService;
+import com.hieunguyen.podcastai.specification.SpecificationsBuilder;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,6 +129,33 @@ public class UserServiceImpl implements UserService{
         currentUser.setStatus(com.hieunguyen.podcastai.enums.UserStatus.INACTIVE);
         userRepository.save(currentUser);
         log.info("Successfully deleted account for user: {}", currentUser.getEmail());
+    }
+
+    @Override
+    public Page<UserDto> searchUserBySpecification(Pageable pageable, String ...search) {
+
+        SpecificationsBuilder<User> builder = new SpecificationsBuilder<>();
+
+        if (search.length > 0) {
+            Pattern pattern = Pattern.compile("(\\w+)([<:>~!])(\\*?)([^*]*)(\\*?)");
+            for (String s : search) {
+                Matcher matcher = pattern.matcher(s);
+                if (matcher.find()) {
+                    String key = matcher.group(1);
+                    String operation = matcher.group(2);
+                    String prefix = matcher.group(3);
+                    String value = matcher.group(4);
+                    String suffix = matcher.group(5);
+
+                    builder.with(key, operation, value, prefix, suffix);
+                }
+            }
+
+            Page<User> users = userRepository.findAll(Objects.requireNonNull(builder.build()), pageable);
+
+            return users.map(userMapper::toDto);
+        }
+        return userRepository.findAll(pageable).map(userMapper::toDto);
     }
     
 }

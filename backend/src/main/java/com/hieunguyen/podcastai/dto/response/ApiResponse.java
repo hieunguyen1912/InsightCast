@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.domain.Page;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,6 +22,8 @@ public class ApiResponse<T> {
     private T data;
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
+    private PageInfo pageInfo;
+
     
     public static <T> ApiResponse<T> success(String message, T data) {
         return ApiResponse.<T>builder()
@@ -36,6 +40,16 @@ public class ApiResponse<T> {
                 .code(1000)
                 .message(message)
                 .data(data)
+                .build();
+    }
+
+    public static <T> ApiResponse<T> success(String message, T data, PageInfo pageInfo) {
+        return ApiResponse.<T>builder()
+                .status(200)
+                .code(1000)
+                .message(message)
+                .data(data)
+                .pageInfo(pageInfo)
                 .build();
     }
     
@@ -105,5 +119,26 @@ public class ApiResponse<T> {
                 .code(code)
                 .message(message)
                 .build();
+    }
+
+    @Data
+    public static class PageInfo {
+        private int page;
+        private int size;
+        private long totalElements;
+        private int totalPages;
+        private boolean hasNext;
+        private boolean hasPrevious;
+        
+        public static PageInfo from(Page<?> page) {
+            PageInfo info = new PageInfo();
+            info.page = page.getNumber();
+            info.size = page.getSize();
+            info.totalElements = page.getTotalElements();
+            info.totalPages = page.getTotalPages();
+            info.hasNext = page.hasNext();
+            info.hasPrevious = page.hasPrevious();
+            return info;
+        }
     }
 }

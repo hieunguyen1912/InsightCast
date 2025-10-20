@@ -1,6 +1,5 @@
 package com.hieunguyen.podcastai.dto.request;
 
-import com.hieunguyen.podcastai.enums.ContentSource;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,11 +21,7 @@ public class AudioRequest {
     
     @Size(max = 2000, message = "Description must not exceed 2000 characters")
     private String description;
-    
-    // Content Source Information
-    @NotNull(message = "Content source is required")
-    private ContentSource contentSource;
-    
+
     // For NEWS_API source
     @NotBlank(message = "News article URL is required when content source is NEWS_API")
     @Pattern(regexp = "^https?://.*", message = "News article URL must be a valid HTTP/HTTPS URL")
