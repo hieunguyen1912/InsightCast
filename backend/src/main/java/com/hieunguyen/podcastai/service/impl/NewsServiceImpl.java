@@ -1,6 +1,7 @@
 package com.hieunguyen.podcastai.service.impl;
 
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
@@ -75,23 +76,42 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public List<NewsArticleResponse> getLatestNews(int limit) {
+    public List<NewsArticleSummaryResponse> getLatestNews(int limit) {
         log.info("Getting latest {} news articles", limit);
         
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "publishedAt"));
         Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
         
-        return newsArticleMapper.toDtoList(page.getContent());
+        return newsArticleMapper.toSummaryDtoList(page.getContent());
     }
 
     @Override
-    public List<NewsArticleResponse> getTrendingNews(int limit) {
+    public List<NewsArticleSummaryResponse> getTrendingNews(int limit) {
         log.info("Getting trending {} news articles", limit);
         
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "viewCount"));
         Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
         
-        return newsArticleMapper.toDtoList(page.getContent());
+        return newsArticleMapper.toSummaryDtoList(page.getContent());
+    }
+
+    @Override
+    public Optional<NewsArticleSummaryResponse> getFeaturedArticle() {
+        log.info("Getting featured article");
+        
+        // Featured article logic: Most viewed recent article (within last 7 days)
+        // You can customize this logic based on your business requirements
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "viewCount"));
+        Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
+        
+        if (page.hasContent()) {
+            NewsArticle featuredArticle = page.getContent().get(0);
+            log.info("Found featured article: {} with {} views", featuredArticle.getTitle(), featuredArticle.getViewCount());
+            return Optional.of(newsArticleMapper.toSummaryDto(featuredArticle));
+        }
+        
+        log.warn("No featured article found");
+        return Optional.empty();
     }
     
 }

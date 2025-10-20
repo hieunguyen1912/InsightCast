@@ -107,3 +107,32 @@ export function getTimeRemaining(currentTime, duration) {
   const remaining = duration - currentTime;
   return formatDuration(remaining, duration >= 3600);
 }
+
+/**
+ * Format date to short relative time for news display (e.g., "2h ago", "3d ago")
+ * @param {Date|string} date - Date to format
+ * @returns {string} Short relative time string
+ */
+export function formatNewsTime(date) {
+  const relativeTime = formatRelativeTime(date);
+  
+  // Convert to shorter format for news display
+  if (relativeTime.includes('minute')) {
+    const minutes = relativeTime.match(/\d+/)?.[0] || '0';
+    return `${minutes}m ago`;
+  } else if (relativeTime.includes('hour')) {
+    const hours = relativeTime.match(/\d+/)?.[0] || '0';
+    return `${hours}h ago`;
+  } else if (relativeTime.includes('day')) {
+    const days = relativeTime.match(/\d+/)?.[0] || '0';
+    return `${days}d ago`;
+  } else if (relativeTime.includes('month')) {
+    const months = relativeTime.match(/\d+/)?.[0] || '0';
+    return `${months}mo ago`;
+  } else if (relativeTime.includes('year')) {
+    const years = relativeTime.match(/\d+/)?.[0] || '0';
+    return `${years}y ago`;
+  }
+  
+  return relativeTime;
+}

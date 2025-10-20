@@ -1,41 +1,24 @@
 package com.hieunguyen.podcastai.dto.response;
 
-import com.hieunguyen.podcastai.entity.NewsArticle;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
+import lombok.experimental.SuperBuilder;
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-public class NewsArticleResponse {
+@EqualsAndHashCode(callSuper = true)
+public class NewsArticleResponse extends BaseNewsArticleResponse {
 
-    private Long id;
-    private String title;
-    private String description;
     private String content;
-    private String url;
-    private String sourceName;
-    private String author;
-    private Instant publishedAt;
-    private String imageUrl;
-    private String language;
-    private Long viewCount;
-    private Long likeCount;
-    private Long shareCount;
 
-    // Nested objects (avoid lazy loading)
     private CategoryResponse category;
     private NewsSourceResponse newsSource;
 
     @Data
-    @Builder
+    @SuperBuilder
     @NoArgsConstructor
-    @AllArgsConstructor
     public static class CategoryResponse {
         private Long id;
         private String name;
@@ -43,14 +26,12 @@ public class NewsArticleResponse {
     }
 
     @Data
-    @Builder
+    @SuperBuilder
     @NoArgsConstructor
-    @AllArgsConstructor
     public static class NewsSourceResponse {
         private Long id;
         private String name;
         private String displayName;
         private String url;
     }
-
 }

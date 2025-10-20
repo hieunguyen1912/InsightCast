@@ -10,7 +10,7 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './routes/ProtectedRoute.jsx';
 import { routes } from './routes/index.js';
-import './App.css';
+import './index.css';
 
 function AppContent() {
   const location = useLocation();

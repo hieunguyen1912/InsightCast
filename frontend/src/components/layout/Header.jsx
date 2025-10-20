@@ -1,12 +1,12 @@
 /**
- * Header component - Modern Minimalist + Soft Neumorphism Design
- * Clean navigation with floating elements and subtle shadows
+ * Header component - Sports News Website Design
+ * Black header with navigation and subscribe button
  */
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import '../../styles/components/Header.css';
+import { Search, Menu } from 'lucide-react';
 
 function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -27,102 +27,66 @@ function Header() {
   };
 
   return (
-    <header className="header" role="banner">
-      <div className="header-container">
-        {/* Logo */}
-        <div className="header-logo">
-          <Link to="/" aria-label="PodcastAI Home" className="logo-link">
-            <span className="logo-text">
-              <span className="logo-podcast">Podcast</span>
-              <span className="logo-ai">AI</span>
-            </span>
-          </Link>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="header-nav">
-          <Link to="/discover" className="nav-link">
-            Discover
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6,9 12,15 18,9"/>
-            </svg>
-          </Link>
-          <Link to="/create" className="nav-link">
-            Create
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6,9 12,15 18,9"/>
-            </svg>
-          </Link>
-          <Link to="/features" className="nav-link">
-            Features
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6,9 12,15 18,9"/>
-            </svg>
-          </Link>
-          <Link to="/pricing" className="nav-link">Pricing</Link>
-        </nav>
-
-        {/* User Menu */}
-        <div className="header-user">
-          {isAuthenticated ? (
-            <div className="user-menu">
-              <button
-                className="user-menu-trigger"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                aria-expanded={isMenuOpen}
-                aria-haspopup="true"
-                aria-label="User menu"
-              >
-                <span className="user-avatar">
-                  {user?.firstName?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
-                </span>
-                <span className="user-name">
-                  {user?.firstName || user?.username || 'User'}
-                </span>
-                <svg 
-                  width="12" 
-                  height="12" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2"
-                  className={`menu-arrow ${isMenuOpen ? 'open' : ''}`}
-                >
-                  <polyline points="6,9 12,15 18,9"/>
-                </svg>
-              </button>
-
-              {isMenuOpen && (
-                <div className="user-menu-dropdown" role="menu">
-                  <Link to="/dashboard" role="menuitem" onClick={() => setIsMenuOpen(false)} className="menu-item">
+    <>
+      {/* Main Header */}
+      <header className="bg-black text-white" role="banner">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link to="/" aria-label="W LET'SREAD Home" className="text-2xl font-bold">
+                W LET'SREAD
+              </Link>
+            </div>
+            
+            {/* Navigation */}
+            <nav className="hidden md:flex space-x-8">
+              <Link to="/" className="text-white hover:text-gray-300 transition-colors">Home</Link>
+              <Link to="/join" className="text-white hover:text-gray-300 transition-colors">Join Us</Link>
+              <Link to="/care" className="text-white hover:text-gray-300 transition-colors">Customer Care</Link>
+              <Link to="/contact" className="text-white hover:text-gray-300 transition-colors">Reach Out</Link>
+              <Link to="/about" className="text-white hover:text-gray-300 transition-colors">About Us</Link>
+            </nav>
+            
+            {/* Subscribe Button */}
+            <div className="flex items-center space-x-4">
+              {isAuthenticated ? (
+                <div className="flex items-center space-x-2">
+                  <span className="text-white text-sm">Welcome, {user?.firstName || user?.username || 'User'}!</span>
+                  <Link to="/dashboard" className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md font-medium transition-colors">
                     Dashboard
                   </Link>
-                  <Link to="/me" role="menuitem" onClick={() => setIsMenuOpen(false)} className="menu-item">
-                    Profile
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Link to="/login" className="text-white hover:text-gray-300 transition-colors">
+                    Login
                   </Link>
-                  <Link to="/favorites" role="menuitem" onClick={() => setIsMenuOpen(false)} className="menu-item">
-                    Favorites
+                  <Link to="/register" className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                    Subscribe
                   </Link>
-                  <div className="menu-divider"></div>
-                  <button
-                    onClick={handleLogout}
-                    role="menuitem"
-                    className="menu-item logout-button"
-                  >
-                    Logout
-                  </button>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="auth-buttons">
-              <Link to="/login" className="btn btn-outline">Log in</Link>
-              <Link to="/register" className="btn btn-primary">Sign up</Link>
-            </div>
-          )}
+          </div>
+        </div>
+      </header>
+
+      {/* Secondary Header */}
+      <div className="bg-gray-100 border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-12">
+            <button className="p-2">
+              <Menu className="h-5 w-5 text-gray-600" />
+            </button>
+            <p className="text-gray-800 font-medium">Sign Up for Our Paris Olympics Newsletter</p>
+            <button className="p-2">
+              <Search className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
         </div>
       </div>
-    </header>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ package com.hieunguyen.podcastai.controller;
 
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.service.NewsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NewsController {
     private final NewsService newsService;
-
+    
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<NewsArticleResponse>>> search(Pageable pageable, 
         @RequestParam(value = "search", required = false) String... search) {
@@ -31,25 +32,34 @@ public class NewsController {
     }
 
     @GetMapping("/latest")
-    public ResponseEntity<ApiResponse<List<NewsArticleResponse>>> getLatestNews(
+    public ResponseEntity<ApiResponse<List<NewsArticleSummaryResponse>>> getLatestNews(
         @RequestParam(defaultValue = "10") int limit) {
         
         log.info("Getting latest {} news articles", limit);
         
-        List<NewsArticleResponse> response = newsService.getLatestNews(limit);
+        List<NewsArticleSummaryResponse> response = newsService.getLatestNews(limit);
         
         return ResponseEntity.ok(ApiResponse.success("Latest news fetched successfully", response));
     }
 
     @GetMapping("/trending")
-    public ResponseEntity<ApiResponse<List<NewsArticleResponse>>> getTrendingNews(
+    public ResponseEntity<ApiResponse<List<NewsArticleSummaryResponse>>> getTrendingNews(
         @RequestParam(defaultValue = "10") int limit) {
         
         log.info("Getting trending {} news articles", limit);
         
-        List<NewsArticleResponse> response = newsService.getTrendingNews(limit);
+        List<NewsArticleSummaryResponse> response = newsService.getTrendingNews(limit);
         
         return ResponseEntity.ok(ApiResponse.success("Trending news fetched successfully", response));
+    }
+
+    @GetMapping("/featured")
+    public ResponseEntity<ApiResponse<NewsArticleSummaryResponse>> getFeaturedArticle() {
+        log.info("Getting featured article");
+        
+        return newsService.getFeaturedArticle()
+            .map(response -> ResponseEntity.ok(ApiResponse.success("Featured article fetched successfully", response)))
+            .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}")
