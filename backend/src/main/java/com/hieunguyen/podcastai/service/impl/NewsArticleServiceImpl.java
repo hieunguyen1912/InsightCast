@@ -5,10 +5,11 @@ import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
+import com.hieunguyen.podcastai.service.NewsArticleService;
 import com.hieunguyen.podcastai.specification.SpecificationsBuilder;
 import com.hieunguyen.podcastai.service.NewsService;
 
-import com.hieunguyen.podcastai.validation.SearchValidator;
+import com.hieunguyen.podcastai.validator.SearchValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,7 +28,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class NewsServiceImpl implements NewsService {
+public class NewsArticleServiceImpl implements NewsArticleService {
 
     private final NewsArticleRepository newsArticleRepository;
     private final NewsArticleMapper newsArticleMapper;

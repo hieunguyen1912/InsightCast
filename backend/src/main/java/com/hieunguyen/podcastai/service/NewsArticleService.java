@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 
-public interface NewsService {
+public interface NewsArticleService {
 
     Page<NewsArticleResponse> searchNewsBySpecification(Pageable pageable, String... search);
     Page<NewsArticleResponse> searchFullText(
@@ -25,4 +25,6 @@ public interface NewsService {
     List<NewsArticleSummaryResponse> getLatestNews(int limit);
     List<NewsArticleSummaryResponse> getTrendingNews(int limit);
     Optional<NewsArticleSummaryResponse> getFeaturedArticle();
+
+
 }
