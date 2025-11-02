@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -20,14 +19,11 @@ public class CategoryDto {
     private String name;
     private String description;
     private String slug;
-    private String iconUrl;
-    private Integer sortOrder;
+    private Boolean isActive;
+    private String icon;
+    private String color;
+    private Integer displayOrder;
     private Long parentCategoryId;
     private String parentCategoryName;
-    private List<CategoryDto> subCategories;
-    private Instant createdAt;
-    private Instant updatedAt;
-    private String createdBy;
-    private String updatedBy;
-    private Long version;
+    private List<CategoryDto> children;
 }

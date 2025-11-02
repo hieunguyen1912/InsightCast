@@ -5,6 +5,8 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -12,8 +14,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import jakarta.persistence.EntityListeners;
 
 @MappedSuperclass
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @EntityListeners(AuditingEntityListener.class)
 public abstract class AuditableEntity extends BaseEntity {
     

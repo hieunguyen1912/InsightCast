@@ -4,11 +4,7 @@ import com.hieunguyen.podcastai.dto.request.CategoryRequest;
 import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
 import com.hieunguyen.podcastai.entity.Category;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.Named;
-import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.*;
 
 import java.util.List;
 
@@ -17,19 +13,12 @@ public interface CategoryMapper {
 
     Category toEntity(CategoryRequest request);
 
+    @Mapping(target = "children", ignore = true)
+    @Mapping(target = "parentCategoryId", source = "parent.id")
+    @Mapping(target = "parentCategoryName", source = "parent.name")
     CategoryDto toDto(Category category);
 
     List<CategoryDto> toDtoList(List<Category> categories);
 
     void updateEntity(CategoryUpdateRequest request, @MappingTarget Category category);
-
-    Category toEntityForUpdate(CategoryRequest request);
-
-    @Named("mapSubCategories")
-    default List<CategoryDto> mapSubCategories(List<Category> subCategories) {
-        if (subCategories == null || subCategories.isEmpty()) {
-            return null;
-        }
-        return toDtoList(subCategories);
-    }
 }

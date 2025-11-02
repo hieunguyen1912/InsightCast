@@ -2,13 +2,19 @@ package com.hieunguyen.podcastai.service.impl;
 
 import com.hieunguyen.podcastai.dto.request.CategoryRequest;
 import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
+import com.hieunguyen.podcastai.dto.response.BreadcrumbDto;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
+import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.entity.Category;
+import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.mapper.CategoryMapper;
+import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.CategoryRepository;
+import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.CategoryService;
+import com.hieunguyen.podcastai.util.SlugHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -16,7 +22,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -26,16 +34,45 @@ public class CategoryServiceImpl implements CategoryService {
     
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
+    private final NewsArticleRepository newsArticleRepository;
+    private final NewsArticleMapper newsArticleMapper;
     
     @Override
     public CategoryDto createCategory(CategoryRequest request) {
         log.info("Creating category with name: {}", request.getName());
         
-        // Validation is handled by @UniqueCategoryName and @UniqueCategorySlug validators in CategoryRequest
+        if (categoryRepository.existsByNameIgnoreCase(request.getName())) {
+            throw new AppException(ErrorCode.CATEGORY_NAME_EXISTS);
+        }
+        
+        String slug = SlugHelper.generateSlug(request.getName());
+        
+        String originalSlug = slug;
+        int counter = 1;
+        while (categoryRepository.existsBySlugIgnoreCase(slug)) {
+            slug = originalSlug + "-" + counter;
+            counter++;
+        }
+        
         Category category = categoryMapper.toEntity(request);
+        category.setSlug(slug);
+        
+        // Calculate level and path based on parent
+        if (request.getParentId() != null) {
+            Category parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+            category.setParent(parent);
+            category.setLevel(parent.getLevel() + 1);
+            category.setPath(parent.getPath() + "/" + slug);
+        } else {
+            // Root category
+            category.setLevel(0);
+            category.setPath("/" + slug);
+        }
         
         Category savedCategory = categoryRepository.save(category);
-        log.info("Successfully created category with ID: {}", savedCategory.getId());
+        log.info("Successfully created category with ID: {}, slug: {}, level: {}, path: {}", 
+                savedCategory.getId(), savedCategory.getSlug(), savedCategory.getLevel(), savedCategory.getPath());
         
         return categoryMapper.toDto(savedCategory);
     }
@@ -50,18 +87,7 @@ public class CategoryServiceImpl implements CategoryService {
         
         return categoryMapper.toDto(category);
     }
-    
-    @Override
-    @Transactional(readOnly = true)
-    public CategoryDto getCategoryByName(String name) {
-        log.info("Getting category by name: {}", name);
-        
-        Category category = categoryRepository.findByNameIgnoreCase(name)
-                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NAME_NOT_FOUND));
-        
-        return categoryMapper.toDto(category);
-    }
-    
+
     @Override
     @Transactional(readOnly = true)
     public CategoryDto getCategoryBySlug(String slug) {
@@ -79,18 +105,10 @@ public class CategoryServiceImpl implements CategoryService {
         
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
-        
-        // Check if name is being changed and if new name already exists
+
         if (request.getName() != null && !request.getName().equals(category.getName())) {
             if (categoryRepository.existsByNameIgnoreCase(request.getName())) {
                 throw new AppException(ErrorCode.CATEGORY_NAME_EXISTS);
-            }
-        }
-        
-        // Check if slug is being changed and if new slug already exists
-        if (request.getSlug() != null && !request.getSlug().equals(category.getSlug())) {
-            if (categoryRepository.existsBySlugIgnoreCase(request.getSlug())) {
-                throw new AppException(ErrorCode.CATEGORY_SLUG_EXISTS);
             }
         }
 
@@ -128,5 +146,102 @@ public class CategoryServiceImpl implements CategoryService {
         
         List<Category> categories = categoryRepository.findAll();
         return categoryMapper.toDtoList(categories);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryDto> getCategoryTree() {
+        log.info("Getting category tree");
+        
+        List<Category> rootCategories = categoryRepository.findByParentIsNull();
+        return rootCategories.stream()
+                .map(this::buildCategoryTree)
+                .collect(Collectors.toList());
+    }
+    
+    private CategoryDto buildCategoryTree(Category category) {
+        CategoryDto dto = categoryMapper.toDto(category);
+        
+        List<Category> children = categoryRepository.findByParentId(category.getId());
+        if (!children.isEmpty()) {
+            List<CategoryDto> childrenDtos = children.stream()
+                    .map(this::buildCategoryTree)
+                    .collect(Collectors.toList());
+            dto.setChildren(childrenDtos);
+        }
+        
+        return dto;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryDto> getRootCategories() {
+        log.info("Getting root categories");
+        
+        List<Category> rootCategories = categoryRepository.findByParentIsNull();
+        return categoryMapper.toDtoList(rootCategories);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryDto> getCategoryChildren(Long id) {
+        log.info("Getting children of category with ID: {}", id);
+        
+        // Verify category exists
+        if (!categoryRepository.existsById(id)) {
+            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+        
+        List<Category> children = categoryRepository.findByParentId(id);
+        return categoryMapper.toDtoList(children);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<BreadcrumbDto> getCategoryBreadcrumb(Long id) {
+        log.info("Getting breadcrumb for category with ID: {}", id);
+        
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        
+        List<BreadcrumbDto> breadcrumbs = new ArrayList<>();
+        buildBreadcrumb(category, breadcrumbs);
+        
+        return breadcrumbs;
+    }
+    
+    private void buildBreadcrumb(Category category, List<BreadcrumbDto> breadcrumbs) {
+        if (category == null) {
+            return;
+        }
+        
+        // Recursively build from parent first
+        if (category.getParent() != null) {
+            buildBreadcrumb(category.getParent(), breadcrumbs);
+        }
+        
+        // Add current category to breadcrumb
+        BreadcrumbDto breadcrumb = BreadcrumbDto.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .slug(category.getSlug())
+                .level(category.getLevel())
+                .build();
+        
+        breadcrumbs.add(breadcrumb);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NewsArticleResponse> getArticlesByCategory(Long id, Pageable pageable) {
+        log.info("Getting articles for category with ID: {}", id);
+        
+        // Verify category exists
+        if (!categoryRepository.existsById(id)) {
+            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+        
+        Page<NewsArticle> articles = newsArticleRepository.findByCategoryId(id, pageable);
+        return articles.map(newsArticleMapper::toDto);
     }
 }

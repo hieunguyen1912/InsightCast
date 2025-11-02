@@ -1,4 +1,4 @@
-package com.hieunguyen.podcastai.validation;
+package com.hieunguyen.podcastai.validator;
 
 import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.exception.AppException;

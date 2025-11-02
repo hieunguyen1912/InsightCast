@@ -265,4 +265,3 @@ public class ArticleServiceImpl implements ArticleService {
         return articleMapper.toDto(updatedArticle);
     }
 }
-

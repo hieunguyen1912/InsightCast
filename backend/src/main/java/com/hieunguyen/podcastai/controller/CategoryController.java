@@ -3,7 +3,9 @@ package com.hieunguyen.podcastai.controller;
 import com.hieunguyen.podcastai.dto.request.CategoryRequest;
 import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
+import com.hieunguyen.podcastai.dto.response.BreadcrumbDto;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
+import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +30,6 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryDto>> createCategory(@Valid @RequestBody CategoryRequest request) {
         log.info("Creating category with name: {}", request.getName());
         
@@ -37,24 +38,12 @@ public class CategoryController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Category created successfully", category));
     }
-    
-    /**
-     * Get category by ID
-     */
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable Long id) {
         log.info("Getting category by ID: {}", id);
         
         CategoryDto category = categoryService.getCategoryById(id);
-        
-        return ResponseEntity.ok(ApiResponse.success("Category retrieved successfully", category));
-    }
-
-    @GetMapping("/name/{name}")
-    public ResponseEntity<ApiResponse<CategoryDto>> getCategoryByName(@PathVariable String name) {
-        log.info("Getting category by name: {}", name);
-        
-        CategoryDto category = categoryService.getCategoryByName(name);
         
         return ResponseEntity.ok(ApiResponse.success("Category retrieved successfully", category));
     }
@@ -110,9 +99,77 @@ public class CategoryController {
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
         log.info("Getting all categories");
-        
+
         List<CategoryDto> categories = categoryService.getAllCategories();
-        
+
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
+    }
+
+
+    @GetMapping("/tree")
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getCategoryTree() {
+        log.info("Getting category tree");
+        
+        List<CategoryDto> categoryTree = categoryService.getCategoryTree();
+        
+        return ResponseEntity.ok(ApiResponse.success("Category tree retrieved successfully", categoryTree));
+    }
+    
+    /**
+     * Get root categories only
+     */
+    @GetMapping("/root")
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getRootCategories() {
+        log.info("Getting root categories");
+        
+        List<CategoryDto> rootCategories = categoryService.getRootCategories();
+        
+        return ResponseEntity.ok(ApiResponse.success("Root categories retrieved successfully", rootCategories));
+    }
+    
+    /**
+     * Get children of a category
+     */
+    @GetMapping("/{id}/children")
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getCategoryChildren(@PathVariable Long id) {
+        log.info("Getting children of category with ID: {}", id);
+        
+        List<CategoryDto> children = categoryService.getCategoryChildren(id);
+        
+        return ResponseEntity.ok(ApiResponse.success("Category children retrieved successfully", children));
+    }
+    
+    /**
+     * Get breadcrumb path for a category
+     */
+    @GetMapping("/{id}/breadcrumb")
+    public ResponseEntity<ApiResponse<List<BreadcrumbDto>>> getCategoryBreadcrumb(@PathVariable Long id) {
+        log.info("Getting breadcrumb for category with ID: {}", id);
+        
+        List<BreadcrumbDto> breadcrumbs = categoryService.getCategoryBreadcrumb(id);
+        
+        return ResponseEntity.ok(ApiResponse.success("Category breadcrumb retrieved successfully", breadcrumbs));
+    }
+    
+    /**
+     * Get articles by category
+     */
+    @GetMapping("/{id}/articles")
+    public ResponseEntity<ApiResponse<Page<NewsArticleResponse>>> getArticlesByCategory(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "publishedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
+        
+        log.info("Getting articles for category with ID: {}, page={}, size={}, sortBy={}, sortDirection={}", 
+                id, page, size, sortBy, sortDirection);
+        
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
+        
+        Page<NewsArticleResponse> articles = categoryService.getArticlesByCategory(id, pageable);
+        
+        return ResponseEntity.ok(ApiResponse.success("Articles retrieved successfully", articles));
     }
 }

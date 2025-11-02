@@ -67,6 +67,20 @@ public enum ErrorCode {
 
     //Search error code
     INVALID_SEARCH_INPUT(6001, "Invalid search input", HttpStatus.BAD_REQUEST),
+    
+    // Article Error Codes
+    ARTICLE_NOT_FOUND(7001, "Article not found", HttpStatus.NOT_FOUND),
+    ARTICLE_CANNOT_BE_UPDATED(7002, "Article can only be updated when in DRAFT or REJECTED status", HttpStatus.BAD_REQUEST),
+    ARTICLE_CANNOT_BE_DELETED(7003, "Article can only be deleted when in DRAFT status", HttpStatus.BAD_REQUEST),
+    ARTICLE_CANNOT_BE_SUBMITTED(7004, "Article can only be submitted when in DRAFT status", HttpStatus.BAD_REQUEST),
+    FORBIDDEN(7005, "You don't have permission to access this resource", HttpStatus.FORBIDDEN),
+    
+    // Image Error Codes
+    IMAGE_NOT_FOUND(8001, "Image not found", HttpStatus.NOT_FOUND),
+    IMAGE_UPLOAD_FAILED(8002, "Failed to upload image", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_FILE(8003, "Invalid file", HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(8004, "File size exceeds maximum limit", HttpStatus.BAD_REQUEST),
+    INVALID_FILE_TYPE(8005, "Invalid file type. Only images are allowed", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;

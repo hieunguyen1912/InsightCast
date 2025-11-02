@@ -4,7 +4,6 @@ import com.hieunguyen.podcastai.dto.request.user.UserFavoriteRequest;
 import com.hieunguyen.podcastai.dto.response.UserFavoriteDto;
 import com.hieunguyen.podcastai.entity.UserFavorite;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface UserFavoriteMapper {

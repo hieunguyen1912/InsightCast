@@ -1,6 +1,7 @@
 package com.hieunguyen.podcastai.repository;
 
 import com.hieunguyen.podcastai.entity.NewsArticle;
+import com.hieunguyen.podcastai.enums.ArticleStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,12 +11,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
-import java.util.Optional;
+
 
 @Repository
 public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long>, JpaSpecificationExecutor<NewsArticle> {
-    
-    Optional<NewsArticle> findByUrl(String url);
 
     @Query(
             value = "SELECT n.* FROM news_articles n " +
@@ -45,5 +44,12 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long>,
             Pageable pageable);
 
     Page<NewsArticle> findByCategoryId(Long categoryId, Pageable pageable);
+    
+    // Journalist queries
+    Page<NewsArticle> findByAuthorIdAndStatus(Long authorId, ArticleStatus status, Pageable pageable);
+    
+    Page<NewsArticle> findByAuthorId(Long authorId, Pageable pageable);
+    
+    boolean existsBySlug(String slug);
     
 }

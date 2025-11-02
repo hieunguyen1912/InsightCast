@@ -1,6 +1,7 @@
 package com.hieunguyen.podcastai.entity;
 
 import com.hieunguyen.podcastai.entity.base.AuditableEntity;
+import com.hieunguyen.podcastai.enums.ArticleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,33 +18,39 @@ import java.util.List;
 @AllArgsConstructor
 public class NewsArticle extends AuditableEntity {
 
-    @Column(name = "title", nullable = false, length = 500)
+    @Column(name = "title", nullable = false)
     private String title;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "content", columnDefinition = "TEXT")
+    @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Column(name = "url", nullable = false, length = 1000, unique = true)
-    private String url;
+    @Column(name = "plainText", columnDefinition = "TEXT", nullable = false)
+    private String plainText;
 
-    @Column(name = "source_name", length = 200)
-    private String sourceName;
+    @Column(name = "slug", unique = true, nullable = false)
+    private String slug;
 
-    @Column(name = "author", length = 200)
-    private String author;
+    @Column(name = "featured_image", length = 500)
+    private String featuredImage;
 
-    @Column(name = "published_at")
-    private Instant publishedAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
 
-    @Column(name = "image_url", length = 1000)
-    private String imageUrl;
+    private ArticleStatus status;
+
+    @Column(columnDefinition = "TEXT", name = "rejection_reason")
+    private String rejectionReason;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
 
     @Column(name = "view_count", nullable = false)
     @Builder.Default
@@ -56,9 +63,6 @@ public class NewsArticle extends AuditableEntity {
     @Column(name = "share_count", nullable = false)
     @Builder.Default
     private Long shareCount = 0L;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    private NewsSource sources;
 
     @OneToMany(mappedBy = "newsArticle", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default

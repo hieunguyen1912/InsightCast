@@ -7,7 +7,6 @@ import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.NewsArticleService;
 import com.hieunguyen.podcastai.specification.SpecificationsBuilder;
-import com.hieunguyen.podcastai.service.NewsService;
 
 import com.hieunguyen.podcastai.validator.SearchValidator;
 import lombok.RequiredArgsConstructor;

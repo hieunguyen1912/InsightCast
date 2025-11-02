@@ -4,7 +4,8 @@ import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.dto.response.PaginatedResponse;
-import com.hieunguyen.podcastai.service.NewsService;
+
+import com.hieunguyen.podcastai.service.NewsArticleService;
 import com.hieunguyen.podcastai.util.PaginationHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 public class NewsController {
-    private final NewsService newsService;
+    private final NewsArticleService newsService;
     
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<PaginatedResponse<NewsArticleResponse>>> search(
