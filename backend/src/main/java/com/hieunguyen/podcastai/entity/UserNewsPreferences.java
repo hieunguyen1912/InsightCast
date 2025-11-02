@@ -34,15 +34,6 @@ public class UserNewsPreferences extends BaseEntity {
     @Builder.Default
     private List<Category> preferredCategories = new ArrayList<>();
 
-    @ManyToMany
-    @JoinTable(
-        name = "user_preferred_tags",
-        joinColumns = @JoinColumn(name = "user_news_preferences_id"),
-        inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    @Builder.Default
-    private List<Tag> preferredTags = new ArrayList<>();
-
     @ElementCollection
     @CollectionTable(name = "user_preferred_sources", joinColumns = @JoinColumn(name = "user_news_preferences_id"))
     @Column(name = "source_name")

@@ -2,10 +2,10 @@ package com.hieunguyen.podcastai.service.impl;
 
 import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.entity.NewsSource;
-import com.hieunguyen.podcastai.enums.NewsSourceType;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.repository.NewsSourceRepository;
 import com.hieunguyen.podcastai.service.NewsAggregationService;
+import com.hieunguyen.podcastai.service.NewsContentExtractionService;
 import com.hieunguyen.podcastai.service.NewsSourceFactory;
 import com.hieunguyen.podcastai.service.NewsSourceIntegrationService;
 
@@ -26,6 +26,7 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
     private final NewsSourceFactory newsSourceFactory;
     private final NewsSourceRepository newsSourceRepository;
     private final NewsArticleRepository newsArticleRepository;
+    private final NewsContentExtractionService newsContentExtractionService;
 
     @Override
     @Transactional
@@ -56,7 +57,7 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
         NewsSource source = newsSourceRepository.findById(sourceId)
             .orElseThrow(() -> new RuntimeException("Source not found: " + sourceId));
         
-        if (!source.getIsActive()) {
+        if (Boolean.FALSE.equals(source.getIsActive())) {
             log.warn("Source {} is inactive", source.getName());
             return 0;
         }
@@ -74,30 +75,6 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
 
     @Override
     @Transactional
-    public int fetchNewsFromSourceType(NewsSourceType sourceType) {
-        log.info("Fetching news from all sources of type: {}", sourceType);
-        
-        List<NewsSource> sources = newsSourceRepository
-            .findByTypeAndIsActiveTrue(sourceType);
-        
-        int totalArticles = 0;
-        
-        for (NewsSource source : sources) {
-            try {
-                int articlesCount = fetchNewsFromSource(source.getId());
-                totalArticles += articlesCount;
-            } catch (Exception e) {
-                log.error("Failed to fetch from source {}: {}", source.getName(), e.getMessage(), e);
-                updateSourceStatus(source, false, 0);
-            }
-        }
-        
-        log.info("Completed fetching from {} sources. Total articles: {}", sources.size(), totalArticles);
-        return totalArticles;
-    }
-
-    @Override
-    @Transactional
     public int processAndSaveArticles(List<NewsArticle> articles, NewsSource source) {
         if (articles == null || articles.isEmpty()) {
             return 0;
@@ -109,6 +86,10 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
         
         for (NewsArticle article : articles) {
             try {
+                if (article.getContent() == null || article.getContent().length() < 500) {
+                    newsContentExtractionService.enrichArticleWithFullContent(article);
+                }
+
                 // Check if article already exists
                 Optional<NewsArticle> existingArticle = newsArticleRepository
                     .findByUrl(article.getUrl());
@@ -138,7 +119,6 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
     @Override
     @Transactional
     public void updateSourceStatus(NewsSource source, boolean success, int articleCount) {
-        source.setLastSuccessAt(Instant.now());
         
         if (success) {
             source.setLastSuccessAt(Instant.now());
@@ -168,7 +148,7 @@ public class NewsAggregationServiceImpl implements NewsAggregationService {
         if (source.getLastSuccessAt() == null) {
             return true; // Never fetched before
         }
-        
+
         // Check if last success was within 24 hours
         return source.getLastSuccessAt().isAfter(Instant.now().minusSeconds(24 * 60 * 60));
     }

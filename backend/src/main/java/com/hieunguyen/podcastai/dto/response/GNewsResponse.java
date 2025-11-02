@@ -1,5 +1,6 @@
 package com.hieunguyen.podcastai.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,8 +11,11 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 public class GNewsResponse {
+    @JsonProperty("totalArticles")
     private int totalArticles;
-    private List<Article> article;
+    
+    @JsonProperty("articles")
+    private List<Article> articles;
 
     @Getter
     @Builder
@@ -23,8 +27,13 @@ public class GNewsResponse {
         private String content;
         private String url;
         private String image;
+        
+        @JsonProperty("publishedAt")
         private String publishedAt;
+        
+        @JsonProperty("lang")
         private String lang;
+        
         private Source source;
     }
 
@@ -37,7 +46,4 @@ public class GNewsResponse {
         private String url;
         private String country;
     }
-
-
-
 }

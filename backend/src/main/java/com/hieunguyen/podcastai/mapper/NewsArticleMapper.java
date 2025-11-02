@@ -11,9 +11,6 @@ import java.util.stream.Collectors;
 @Component
 public class NewsArticleMapper {
 
-    /**
-     * Convert NewsArticle entity to NewsArticleResponse DTO (full data)
-     */
     public NewsArticleResponse toDto(NewsArticle entity) {
         if (entity == null) {
             return null;
@@ -36,9 +33,6 @@ public class NewsArticleMapper {
             .build();
     }
 
-    /**
-     * Convert NewsArticle entity to NewsArticleSummaryResponse DTO (lightweight)
-     */
     public NewsArticleSummaryResponse toSummaryDto(NewsArticle entity) {
         if (entity == null) {
             return null;
@@ -60,9 +54,6 @@ public class NewsArticleMapper {
             .build();
     }
 
-    /**
-     * Convert list of NewsArticle entities to list of NewsArticleResponse DTOs
-     */
     public List<NewsArticleResponse> toDtoList(List<NewsArticle> entities) {
         if (entities == null) {
             return null;
@@ -73,9 +64,6 @@ public class NewsArticleMapper {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Convert list of NewsArticle entities to list of NewsArticleSummaryResponse DTOs
-     */
     public List<NewsArticleSummaryResponse> toSummaryDtoList(List<NewsArticle> entities) {
         if (entities == null) {
             return null;
@@ -86,9 +74,6 @@ public class NewsArticleMapper {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Map Category entity to CategoryResponse DTO (full data)
-     */
     private NewsArticleResponse.CategoryResponse mapCategory(NewsArticle entity) {
         if (entity.getCategory() == null) {
             return null;

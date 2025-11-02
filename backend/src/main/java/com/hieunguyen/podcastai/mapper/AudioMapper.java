@@ -2,7 +2,9 @@ package com.hieunguyen.podcastai.mapper;
 
 import com.hieunguyen.podcastai.dto.request.AudioRequest;
 import com.hieunguyen.podcastai.dto.response.AudioFileDto;
+import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.entity.AudioFile;
+import com.hieunguyen.podcastai.entity.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -23,11 +25,11 @@ public interface AudioMapper {
     void updateEntity(AudioRequest request, @MappingTarget AudioFile audioFile);
 
     @Named("mapUser")
-    default com.hieunguyen.podcastai.dto.response.UserDto mapUser(com.hieunguyen.podcastai.entity.User user) {
+    default UserDto mapUser(User user) {
         if (user == null) {
             return null;
         }
-        return com.hieunguyen.podcastai.dto.response.UserDto.builder()
+        return UserDto.builder()
             .id(user.getId())
             .username(user.getUsername())
             .email(user.getEmail())

@@ -33,7 +33,7 @@ public class FetchConfiguration extends BaseEntity {
     private String countries;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "category_id")
     private Category category;
 
     @Column(nullable = false)

@@ -18,8 +18,8 @@ public class FetchConfigurationDto {
     private FetchType fetchType;
     private Boolean enabled;
     private String keywords;
-    private String languages;
-    private String countries;
+    private SupportedLanguage languages;
+    private SupportedCountry countries;
     private String categoryName;
     private Integer maxResults;
     private String sortBy;

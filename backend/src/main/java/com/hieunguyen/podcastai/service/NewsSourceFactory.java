@@ -2,6 +2,7 @@ package com.hieunguyen.podcastai.service;
 
 import com.hieunguyen.podcastai.entity.NewsSource;
 import com.hieunguyen.podcastai.service.impl.*;
+import com.hieunguyen.podcastai.validation.GNewsQueryValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,10 +14,11 @@ import org.springframework.web.client.RestTemplate;
 public class NewsSourceFactory {
     
     private final RestTemplate restTemplate;
+    private final GNewsQueryValidator gNewsQueryValidator;
     
     public NewsSourceIntegrationService createService(NewsSource source) {
         try {
-            if (!source.getIsActive()) {
+            if (Boolean.FALSE.equals(source.getIsActive())) {
                 log.warn("Source {} is inactive", source.getName());
                 return null;
             }
@@ -32,10 +34,7 @@ public class NewsSourceFactory {
     private NewsSourceIntegrationService createServiceByType(NewsSource source) {
         return switch (source.getType()) {
             case NEWS_API -> new NewsApiIntegrationService(restTemplate);
-            case GNEWS_API -> new GNewsIntegrationService(restTemplate);
-            // case MEDIASTACK_API -> new MediastackIntegrationService(restTemplate);
-            // case RSS_FEED -> new RssIntegrationService(restTemplate);
-            // case CUSTOM_API -> new CustomApiIntegrationService(restTemplate);
+            case GNEWS_API -> new GNewsIntegrationService(restTemplate, gNewsQueryValidator);
             default -> throw new IllegalArgumentException("Unsupported source type: " + source.getType());
         };
     }
