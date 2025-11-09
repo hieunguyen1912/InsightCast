@@ -1,0 +1,14 @@
+{
+  "customVoiceSettings": {
+    "languageCode": "en-US",
+    "voiceName": "en-US-Standard-A",
+    "speakingRate": 1.0,
+    "pitch": 0.0,
+    "volumeGain": 0.0,
+    "audioEncoding": "MP3",
+    "sampleRateHertz": 24000
+  },
+  "enableSummarization": true,
+  "enableTranslation": false
+}
+

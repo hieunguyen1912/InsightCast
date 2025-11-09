@@ -1,7 +1,6 @@
 package com.hieunguyen.podcastai.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,14 +12,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class TagRequest {
+public class RoleUpdateRequest {
     
-    @NotBlank(message = "Tag name is required")
-    @Size(min = 1, max = 50, message = "Tag name must be between 1 and 50 characters")
+    @Size(min = 1, max = 50, message = "Role name must be between 1 and 50 characters")
     private String name;
     
-    @Size(max = 200, message = "Description must not exceed 200 characters")
+    @Size(max = 255, message = "Description must not exceed 255 characters")
     private String description;
     
-    private Boolean isTrending;
+    private Boolean isActive;
 }
+
