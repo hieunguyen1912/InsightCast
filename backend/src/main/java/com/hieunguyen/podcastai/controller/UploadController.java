@@ -2,12 +2,12 @@ package com.hieunguyen.podcastai.controller;
 
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.ImageResponseDto;
+
 import com.hieunguyen.podcastai.service.ImageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,14 +17,10 @@ import java.util.List;
 @RequestMapping("/api/v1")
 @Slf4j
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 public class UploadController {
 
     private final ImageService imageService;
 
-    /**
-     * POST /api/v1/upload - Upload image for an article
-     */
     @PostMapping("/upload")
     public ResponseEntity<ApiResponse<ImageResponseDto>> uploadImage(
             @RequestParam("articleId") Long articleId,
@@ -53,9 +49,7 @@ public class UploadController {
         return ResponseEntity.ok(ApiResponse.success("Images retrieved successfully", images));
     }
 
-    /**
-     * DELETE /api/v1/images/{id} - Delete an image
-     */
+
     @DeleteMapping("/images/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteImage(@PathVariable Long id) {
         log.info("Deleting image: {}", id);

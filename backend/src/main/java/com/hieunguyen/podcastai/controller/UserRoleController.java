@@ -22,9 +22,6 @@ public class UserRoleController {
     
     private final UserRoleService userRoleService;
 
-    /**
-     * GET /api/v1/users/{userId}/roles - Lấy roles của user
-     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<RoleDto>>> getUserRoles(@PathVariable Long userId) {
@@ -35,9 +32,6 @@ public class UserRoleController {
         return ResponseEntity.ok(ApiResponse.success("User roles retrieved successfully", roles));
     }
 
-    /**
-     * POST /api/v1/users/{userId}/roles - Gán role cho user
-     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> assignRoleToUser(
@@ -51,9 +45,6 @@ public class UserRoleController {
                 .body(ApiResponse.created("Role assigned successfully", role));
     }
 
-    /**
-     * DELETE /api/v1/users/{userId}/roles/{roleId} - Gỡ role khỏi user
-     */
     @DeleteMapping("/{roleId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> revokeRoleFromUser(

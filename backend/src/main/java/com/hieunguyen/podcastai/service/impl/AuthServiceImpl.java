@@ -1,5 +1,7 @@
 package com.hieunguyen.podcastai.service.impl;
 
+import com.hieunguyen.podcastai.entity.Role;
+import com.hieunguyen.podcastai.repository.RoleRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,24 +21,26 @@ import com.hieunguyen.podcastai.dto.request.user.UserRegisterRequest;
 import com.hieunguyen.podcastai.dto.response.TokenDto;
 import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.dto.response.UserLoginResponse;
-import com.hieunguyen.podcastai.dto.response.UserRegisterResponse;
 import com.hieunguyen.podcastai.entity.RefreshToken;
 import com.hieunguyen.podcastai.entity.User;
 import com.hieunguyen.podcastai.enums.ErrorCode;
-import com.hieunguyen.podcastai.enums.UserRole;
 import com.hieunguyen.podcastai.enums.UserStatus;
 import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.mapper.UserMapper;
 import com.hieunguyen.podcastai.repository.RefreshTokenRepository;
 import com.hieunguyen.podcastai.repository.UserRepository;
 import com.hieunguyen.podcastai.service.AuthService;
+import com.hieunguyen.podcastai.service.UserRoleService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -52,13 +56,15 @@ public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final JwtEncoder jwtEncoder;
+    private final UserRoleService userRoleService;
 
     @Override
-    public UserRegisterResponse register(UserRegisterRequest request) {
+    public UserDto register(UserRegisterRequest request) {
         log.info("Starting user registration for email: {}", request.getEmail());
         
         try {
@@ -78,26 +84,16 @@ public class AuthServiceImpl implements AuthService {
             
             // Set additional fields
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-            user.setRole(UserRole.USER);
             user.setStatus(UserStatus.ACTIVE);
             user.setEmailVerified(false);
             user.setPhoneNumber(request.getPhoneNumber());
-            
-            // Save user
+            Role role = roleRepository.findByCode("USER").orElseThrow(
+                    () -> new AppException(ErrorCode.ROLE_NOT_FOUND)
+            );
+            user.setRoles(Set.of(role));
             User savedUser = userRepository.save(user);
-            log.info("User registered successfully with ID: {}", savedUser.getId());
-            
-            // Map to DTO
-            UserDto userDto = userMapper.toDto(savedUser);
-            
-            // Create response
-            UserRegisterResponse response = UserRegisterResponse.builder()
-                    .user(userDto)
-                    .emailVerificationRequired(true)
-                    .build();
-            
-            // Return response
-            return response;
+
+            return userMapper.toDto(savedUser);
             
         } catch (AppException e) {
             log.error("Registration failed: {}", e.getMessage());
@@ -127,10 +123,9 @@ public class AuthServiceImpl implements AuthService {
         
         // Generate JWT tokens (access + refresh)
         TokenDto tokens = generateTokens(user);
-        
-        // Map user to DTO
+
         UserDto userDto = userMapper.toDto(user);
-        
+
         // Create response
         UserLoginResponse response = UserLoginResponse.builder()
                 .user(userDto)
@@ -150,6 +145,13 @@ public class AuthServiceImpl implements AuthService {
             Instant now = Instant.now();
             Instant expiresAt = now.plus(accessTokenExpirationMs, ChronoUnit.MILLIS);
             
+
+            List<String> roleCodes = user.getRoles() != null 
+                    ? user.getRoles().stream()
+                            .map(Role::getCode)
+                            .collect(Collectors.toList())
+                    : List.of();
+            
             JwtClaimsSet claims = JwtClaimsSet.builder()
                     .issuer("podcastai-backend")
                     .issuedAt(now)
@@ -157,7 +159,6 @@ public class AuthServiceImpl implements AuthService {
                     .subject(user.getId().toString())
                     .claim("username", user.getUsername())
                     .claim("email", user.getEmail())
-                    .claim("role", user.getRole().name())
                     .build();
 
             JwsHeader jwsHeader = JwsHeader.with(SecurityConfig.JWT_ALGORITHM).build();
@@ -208,48 +209,24 @@ public class AuthServiceImpl implements AuthService {
         log.info("Refreshing token for refresh token: {}", token);
         
         try {
-            // Find refresh token
             RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
                     .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
             
-            // Validate refresh token
             if (!refreshToken.isValid()) {
                 log.warn("Invalid refresh token: expired or revoked");
                 throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
             }
 
-            Long tokenUserId = refreshToken.getUser().getId();
-
-            Object principal = SecurityContextHolder.getContext().getAuthentication() != null
-                    ? SecurityContextHolder.getContext().getAuthentication().getPrincipal()
-                    : null;
-            Long currentUserId = null;
-            if (principal instanceof com.hieunguyen.podcastai.entity.User userPrincipal) {
-                currentUserId = userPrincipal.getId();
-            } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
-                // Nếu UserDetails chứa userId, cần custom lại UserDetails
-                // currentUserId = ...;
-            }
-
-            if (currentUserId != null && !tokenUserId.equals(currentUserId)) {
-                log.warn("User ID {} is not the owner of the refresh token", currentUserId);
-                throw new AppException(ErrorCode.UNAUTHORIZED);
-            }
-            
-            // Get user
             User user = refreshToken.getUser();
             
-            // Check if user is still active
             if (user.getStatus() != UserStatus.ACTIVE) {
                 log.warn("User account is not active for refresh token");
                 throw new AppException(ErrorCode.USER_INACTIVE);
             }
             
-            // Revoke old refresh token
             refreshToken.setIsRevoked(true);
             refreshTokenRepository.save(refreshToken);
             
-            // Generate new tokens
             TokenDto newTokens = generateTokens(user);
             
             log.info("Token refreshed successfully for user ID: {}", user.getId());

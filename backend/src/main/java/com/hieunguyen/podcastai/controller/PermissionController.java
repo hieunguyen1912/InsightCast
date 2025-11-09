@@ -23,9 +23,6 @@ public class PermissionController {
     
     private final PermissionService permissionService;
 
-    /**
-     * GET /api/v1/permissions - Danh sách permissions (có phân trang)
-     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Page<PermissionDto>>> getAllPermissions(
@@ -45,9 +42,6 @@ public class PermissionController {
         return ResponseEntity.ok(ApiResponse.success("Permissions retrieved successfully", permissions));
     }
 
-    /**
-     * GET /api/v1/permissions/all - Danh sách tất cả permissions (không phân trang)
-     */
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<PermissionDto>>> getAllPermissionsList() {
@@ -58,9 +52,6 @@ public class PermissionController {
         return ResponseEntity.ok(ApiResponse.success("Permissions retrieved successfully", permissions));
     }
 
-    /**
-     * GET /api/v1/permissions/{id} - Chi tiết permission
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PermissionDto>> getPermissionById(@PathVariable Long id) {
@@ -70,5 +61,7 @@ public class PermissionController {
         
         return ResponseEntity.ok(ApiResponse.success("Permission retrieved successfully", permission));
     }
+
+
 }
 

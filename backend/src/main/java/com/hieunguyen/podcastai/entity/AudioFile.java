@@ -14,15 +14,6 @@ import lombok.*;
 @AllArgsConstructor
 public class AudioFile extends AuditableEntity {
 
-    @Column(name = "title", nullable = false, length = 200)
-    private String title;
-
-    @Column(name = "description", length = 2000)
-    private String description;
-
-    @Column(name = "source_url", length = 500)
-    private String sourceUrl; // URL của bài báo, RSS feed, etc.
-
     @Column(name = "file_name", length = 255)
     private String fileName;
 
@@ -38,6 +29,22 @@ public class AudioFile extends AuditableEntity {
 
     @Column(name = "published_at")
     private java.time.Instant publishedAt;
+
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @Column(name = "error_code", length = 50)
+    private String errorCode;
+
+    @Column(name = "retry_count")
+    @Builder.Default
+    private Integer retryCount = 0;
+
+    @Column(name = "operation_name", length = 500)
+    private String operationName;
+
+    @Column(name = "gcs_uri", length = 500)
+    private String gcsUri;
 
     // Relationships
     @ManyToOne(fetch = FetchType.LAZY)

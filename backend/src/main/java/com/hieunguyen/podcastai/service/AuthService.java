@@ -3,12 +3,12 @@ package com.hieunguyen.podcastai.service;
 import com.hieunguyen.podcastai.dto.request.user.UserLoginRequest;
 import com.hieunguyen.podcastai.dto.request.user.UserRegisterRequest;
 import com.hieunguyen.podcastai.dto.response.TokenDto;
+import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.dto.response.UserLoginResponse;
-import com.hieunguyen.podcastai.dto.response.UserRegisterResponse;
 import com.hieunguyen.podcastai.entity.User;
 
 public interface AuthService {
-    UserRegisterResponse register(UserRegisterRequest request);
+    UserDto register(UserRegisterRequest request);
     UserLoginResponse login(UserLoginRequest request);
     TokenDto generateAccessToken(User user);
     TokenDto generateTokens(User user);

@@ -18,7 +18,6 @@ public abstract class BaseNewsArticleResponse {
     private String title;
     private String description;
     private String slug;
-    private UserDto author;
     private Instant publishedAt;
     private String featuredImage;
     private Long viewCount;

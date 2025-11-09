@@ -5,7 +5,9 @@ import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.BreadcrumbDto;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
-import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
+import com.hieunguyen.podcastai.dto.response.PaginatedResponse;
+import com.hieunguyen.podcastai.util.PaginationHelper;
 import com.hieunguyen.podcastai.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,8 +60,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(@PathVariable Long id, 
+    public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(@PathVariable Long id,
                                                                   @Valid @RequestBody CategoryUpdateRequest request) {
         log.info("Updating category with ID: {}", id);
         
@@ -79,7 +80,7 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<CategoryDto>>> getAllCategories(
+    public ResponseEntity<ApiResponse<PaginatedResponse<CategoryDto>>> getAllCategories(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "sortOrder") String sortBy,
@@ -92,8 +93,9 @@ public class CategoryController {
         Pageable pageable = PageRequest.of(page, size, sort);
         
         Page<CategoryDto> categories = categoryService.getAllCategories(pageable);
+        PaginatedResponse<CategoryDto> paginatedResponse = PaginationHelper.toPaginatedResponse(categories);
         
-        return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
+        return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", paginatedResponse));
     }
 
     @GetMapping("/all")
@@ -149,27 +151,5 @@ public class CategoryController {
         List<BreadcrumbDto> breadcrumbs = categoryService.getCategoryBreadcrumb(id);
         
         return ResponseEntity.ok(ApiResponse.success("Category breadcrumb retrieved successfully", breadcrumbs));
-    }
-    
-    /**
-     * Get articles by category
-     */
-    @GetMapping("/{id}/articles")
-    public ResponseEntity<ApiResponse<Page<NewsArticleResponse>>> getArticlesByCategory(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "publishedAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDirection) {
-        
-        log.info("Getting articles for category with ID: {}, page={}, size={}, sortBy={}, sortDirection={}", 
-                id, page, size, sortBy, sortDirection);
-        
-        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
-        Pageable pageable = PageRequest.of(page, size, sort);
-        
-        Page<NewsArticleResponse> articles = categoryService.getArticlesByCategory(id, pageable);
-        
-        return ResponseEntity.ok(ApiResponse.success("Articles retrieved successfully", articles));
     }
 }

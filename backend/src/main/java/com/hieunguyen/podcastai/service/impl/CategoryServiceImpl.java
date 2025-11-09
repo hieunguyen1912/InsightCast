@@ -4,15 +4,11 @@ import com.hieunguyen.podcastai.dto.request.CategoryRequest;
 import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.BreadcrumbDto;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
-import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.entity.Category;
-import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.mapper.CategoryMapper;
-import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.CategoryRepository;
-import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.CategoryService;
 import com.hieunguyen.podcastai.util.SlugHelper;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -34,8 +29,6 @@ public class CategoryServiceImpl implements CategoryService {
     
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
-    private final NewsArticleRepository newsArticleRepository;
-    private final NewsArticleMapper newsArticleMapper;
     
     @Override
     public CategoryDto createCategory(CategoryRequest request) {
@@ -113,6 +106,15 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         categoryMapper.updateEntity(request, category);
+        if (request.getParentId() != null) {
+            Category parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(
+                            () -> new AppException(ErrorCode.CATEGORY_NOT_FOUND)
+                    );
+            category.setParent(parent);
+        } else {
+            category.setParent(null);
+        }
         Category updatedCategory = categoryRepository.save(category);
         
         log.info("Successfully updated category with ID: {}", updatedCategory.getId());
@@ -156,7 +158,7 @@ public class CategoryServiceImpl implements CategoryService {
         List<Category> rootCategories = categoryRepository.findByParentIsNull();
         return rootCategories.stream()
                 .map(this::buildCategoryTree)
-                .collect(Collectors.toList());
+                .toList();
     }
     
     private CategoryDto buildCategoryTree(Category category) {
@@ -166,7 +168,7 @@ public class CategoryServiceImpl implements CategoryService {
         if (!children.isEmpty()) {
             List<CategoryDto> childrenDtos = children.stream()
                     .map(this::buildCategoryTree)
-                    .collect(Collectors.toList());
+                    .toList();
             dto.setChildren(childrenDtos);
         }
         
@@ -229,19 +231,5 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
         
         breadcrumbs.add(breadcrumb);
-    }
-    
-    @Override
-    @Transactional(readOnly = true)
-    public Page<NewsArticleResponse> getArticlesByCategory(Long id, Pageable pageable) {
-        log.info("Getting articles for category with ID: {}", id);
-        
-        // Verify category exists
-        if (!categoryRepository.existsById(id)) {
-            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
-        
-        Page<NewsArticle> articles = newsArticleRepository.findByCategoryId(id, pageable);
-        return articles.map(newsArticleMapper::toDto);
     }
 }

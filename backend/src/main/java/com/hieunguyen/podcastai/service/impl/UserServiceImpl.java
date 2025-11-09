@@ -1,7 +1,9 @@
 package com.hieunguyen.podcastai.service.impl;
 
+import com.hieunguyen.podcastai.dto.request.user.AdminUserUpdateRequest;
 import com.hieunguyen.podcastai.dto.request.user.AvatarUploadRequest;
 import com.hieunguyen.podcastai.dto.request.user.PasswordChangeRequest;
+import com.hieunguyen.podcastai.dto.request.user.UserStatusUpdateRequest;
 import com.hieunguyen.podcastai.dto.request.user.UserUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.entity.User;
@@ -9,6 +11,7 @@ import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.mapper.UserMapper;
 import com.hieunguyen.podcastai.repository.UserRepository;
+import com.hieunguyen.podcastai.service.UserRoleService;
 import com.hieunguyen.podcastai.service.UserService;
 import com.hieunguyen.podcastai.specification.SpecificationsBuilder;
 import com.hieunguyen.podcastai.util.SecurityUtils;
@@ -35,12 +38,14 @@ public class UserServiceImpl implements UserService{
     private final UserMapper userMapper;
     private final SecurityUtils securityUtils;
     private final PasswordEncoder passwordEncoder;
+    private final UserRoleService userRoleService;
 
     @Override
     public UserDto getMe() {
         log.debug("Retrieving current user profile");
         User user = securityUtils.getCurrentUser();
         log.debug("User found: {} with ID: {}", user.getEmail(), user.getId());
+
         return userMapper.toDto(user);
     }
 
@@ -156,6 +161,85 @@ public class UserServiceImpl implements UserService{
             return users.map(userMapper::toDto);
         }
         return userRepository.findAll(pageable).map(userMapper::toDto);
+    }
+
+    @Override
+    public Page<UserDto> getAllUsers(Pageable pageable) {
+        log.info("Getting all users with pagination");
+        Page<User> users = userRepository.findAll(pageable);
+        log.info("Found {} users", users.getTotalElements());
+        return users.map(userMapper::toDto);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUserByAdmin(Long userId, AdminUserUpdateRequest request) {
+        log.info("Admin updating user with ID: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        // Check if username is already taken by another user
+        if (request.getUsername() != null && !user.getUsername().equals(request.getUsername())) {
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+            }
+            user.setUsername(request.getUsername());
+        }
+        
+        // Check if email is already taken by another user
+        if (request.getEmail() != null && !user.getEmail().equals(request.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+            user.setEmail(request.getEmail());
+        }
+        
+        // Update user fields (only if provided)
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getDateOfBirth() != null) {
+            user.setDateOfBirth(request.getDateOfBirth());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+        
+        User updatedUser = userRepository.save(user);
+        log.info("Successfully updated user with ID: {} by admin", userId);
+        return userMapper.toDto(updatedUser);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUserStatus(Long userId, UserStatusUpdateRequest request) {
+        log.info("Admin updating status for user ID: {} to {}", userId, request.getStatus());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        user.setStatus(request.getStatus());
+        User updatedUser = userRepository.save(user);
+        log.info("Successfully updated user status for user ID: {} to {}", userId, request.getStatus());
+        return userMapper.toDto(updatedUser);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUserByAdmin(Long userId) {
+        log.info("Admin deleting user with ID: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        // Soft delete by setting status to DELETED
+        user.setStatus(com.hieunguyen.podcastai.enums.UserStatus.DELETED);
+        userRepository.save(user);
+        log.info("Successfully deleted user with ID: {} by admin", userId);
     }
     
 }

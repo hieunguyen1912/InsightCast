@@ -13,25 +13,20 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AudioFileDto {
-    
     private Long id;
-    private String title;
-    private String description;
-    private String originalText;
-    private String sourceUrl;
+
     private String fileName;
     private String filePath;
     private Long fileSizeBytes;
+
     private ProcessingStatus status;
     private Instant publishedAt;
     private Instant createdAt;
     private Instant updatedAt;
     
-    // URLs for client access
-    private String downloadUrl;
-    private String streamUrl;
+    private String errorMessage;
+    private String errorCode;
+    private Integer retryCount;
     
-    // Relationships
-    private UserDto user;
     private TtsConfigDto ttsConfig;
 }

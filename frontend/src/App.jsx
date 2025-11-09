@@ -3,17 +3,24 @@
  * Root component that sets up the application structure and providers
  */
 
-import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import React, { Suspense, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
-import ProtectedRoute from './routes/ProtectedRoute.jsx';
+import ProtectedRoute from './routes/ProtectedRoute';
 import { routes } from './routes/index.js';
+import { navigationService } from './services/navigationService';
 import './index.css';
 
 function AppContent() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Register navigate function for use outside React components (e.g., axios interceptors)
+  useEffect(() => {
+    navigationService.setNavigator(navigate);
+  }, [navigate]);
   
   // Routes that should not show header and footer
   const authRoutes = ['/login', '/register'];

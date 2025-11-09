@@ -22,16 +22,10 @@ public enum AudioEncoding {
         this.mimeType = mimeType;
     }
 
-    /**
-     * Convert to Google Cloud TTS AudioEncoding enum value
-     */
     public com.google.cloud.texttospeech.v1.AudioEncoding toGoogleAudioEncoding() {
         return com.google.cloud.texttospeech.v1.AudioEncoding.valueOf(this.value);
     }
 
-    /**
-     * Get file extension for this encoding
-     */
     public String getFileExtension() {
         return switch (this) {
             case MP3 -> "mp3";

@@ -1,9 +1,12 @@
 package com.hieunguyen.podcastai.controller;
 
+import com.hieunguyen.podcastai.dto.request.RolePermissionAssignmentRequest;
 import com.hieunguyen.podcastai.dto.request.RoleRequest;
 import com.hieunguyen.podcastai.dto.request.RoleUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
+import com.hieunguyen.podcastai.dto.response.PermissionDto;
 import com.hieunguyen.podcastai.dto.response.RoleDto;
+import com.hieunguyen.podcastai.service.PermissionService;
 import com.hieunguyen.podcastai.service.RoleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +29,9 @@ import java.util.List;
 public class RoleController {
     
     private final RoleService roleService;
+    private final PermissionService permissionService;
 
-    /**
-     * GET /api/v1/roles - Danh sách roles (có phân trang)
-     */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Page<RoleDto>>> getAllRoles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -49,9 +49,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Roles retrieved successfully", roles));
     }
 
-    /**
-     * GET /api/v1/roles/all - Danh sách tất cả roles (không phân trang)
-     */
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRolesList() {
@@ -62,9 +59,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Roles retrieved successfully", roles));
     }
 
-    /**
-     * GET /api/v1/roles/{id} - Chi tiết role
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> getRoleById(@PathVariable Long id) {
@@ -75,9 +69,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Role retrieved successfully", role));
     }
 
-    /**
-     * GET /api/v1/roles/code/{code} - Lấy role theo code
-     */
     @GetMapping("/code/{code}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> getRoleByCode(@PathVariable String code) {
@@ -88,9 +79,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Role retrieved successfully", role));
     }
 
-    /**
-     * POST /api/v1/roles - Tạo role mới
-     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> createRole(@Valid @RequestBody RoleRequest request) {
@@ -102,9 +90,6 @@ public class RoleController {
                 .body(ApiResponse.created("Role created successfully", role));
     }
 
-    /**
-     * PUT /api/v1/roles/{id} - Cập nhật role
-     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> updateRole(
@@ -117,9 +102,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Role updated successfully", role));
     }
 
-    /**
-     * DELETE /api/v1/roles/{id} - Xóa role (soft delete)
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable Long id) {
@@ -130,9 +112,6 @@ public class RoleController {
         return ResponseEntity.ok(ApiResponse.success("Role deleted successfully", null));
     }
 
-    /**
-     * PUT /api/v1/roles/{id}/activate - Kích hoạt lại role
-     */
     @PutMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<RoleDto>> activateRole(@PathVariable Long id) {
@@ -141,6 +120,39 @@ public class RoleController {
         RoleDto role = roleService.activateRole(id);
         
         return ResponseEntity.ok(ApiResponse.success("Role activated successfully", role));
+    }
+
+
+    @GetMapping("/{roleId}/permissions")
+    public ResponseEntity<ApiResponse<List<PermissionDto>>> getRolePermissions(@PathVariable Long roleId) {
+        log.info("Getting permissions for role ID: {}", roleId);
+
+        List<PermissionDto> permissions = permissionService.getRolePermissions(roleId);
+
+        return ResponseEntity.ok(ApiResponse.success("Role permissions retrieved successfully", permissions));
+    }
+
+    @PostMapping("/{roleId}/permissions")
+    public ResponseEntity<ApiResponse<PermissionDto>> assignPermissionToRole(
+            @PathVariable Long roleId,
+            @Valid @RequestBody RolePermissionAssignmentRequest request) {
+        log.info("Assigning permission ID {} to role ID {}", request.getPermissionId(), roleId);
+
+        PermissionDto permission = permissionService.assignPermissionToRole(roleId, request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created("Permission assigned successfully", permission));
+    }
+
+    @DeleteMapping("/{roleId}/permissions/{permissionId}")
+    public ResponseEntity<ApiResponse<Void>> revokePermissionFromRole(
+            @PathVariable Long roleId,
+            @PathVariable Long permissionId) {
+        log.info("Revoking permission ID {} from role ID {}", permissionId, roleId);
+
+        permissionService.revokePermissionFromRole(roleId, permissionId);
+
+        return ResponseEntity.ok(ApiResponse.success("Permission revoked successfully", null));
     }
 }
 

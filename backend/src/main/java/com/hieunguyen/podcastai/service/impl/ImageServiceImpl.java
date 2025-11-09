@@ -166,6 +166,89 @@ public class ImageServiceImpl implements ImageService {
         }
     }
 
+    @Override
+    public ImageResponseDto uploadFeaturedImage(Long newsArticleId, MultipartFile file) {
+        log.info("Uploading featured image for news article: {}, filename: {}, size: {} bytes",
+                newsArticleId, file.getOriginalFilename(), file.getSize());
+
+        NewsArticle newsArticle = articleRepository.findById(newsArticleId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+
+        var currentUser = securityUtils.getCurrentUser();
+        if (!newsArticle.getAuthor().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        // Validate file
+        validateImageFile(file);
+
+        try {
+            // Delete old featured image if exists
+            String oldFeaturedImage = newsArticle.getFeaturedImage();
+            if (oldFeaturedImage != null && !oldFeaturedImage.isEmpty()) {
+                deleteOldFeaturedImage(oldFeaturedImage, newsArticleId);
+            }
+
+            // Create upload directory if not exists
+            Path uploadDir = Paths.get(imageStoragePath);
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            // Generate unique filename
+            String originalFilename = file.getOriginalFilename();
+            String extension = getFileExtension(originalFilename);
+            String uniqueFilename = "featured_" + UUID.randomUUID().toString() + "." + extension;
+
+            // Create subdirectory by article ID
+            Path articleDir = uploadDir.resolve(String.valueOf(newsArticleId));
+            if (!Files.exists(articleDir)) {
+                Files.createDirectories(articleDir);
+            }
+
+            // Save file
+            Path filePath = articleDir.resolve(uniqueFilename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Generate URL (relative path or full URL)
+            String url = "/api/v1/images/" + newsArticleId + "/" + uniqueFilename;
+
+            log.info("Featured image uploaded successfully for news article: {}", newsArticleId);
+
+            // Return ImageResponseDto (caller is responsible for setting URL and saving article)
+            return ImageResponseDto.builder()
+                    .url(url)
+                    .fileName(originalFilename)
+                    .fileSize(file.getSize())
+                    .contentType(file.getContentType())
+                    .build();
+
+        } catch (IOException e) {
+            log.error("Error uploading featured image: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
+    private void deleteOldFeaturedImage(String oldUrl, Long newsArticleId) {
+        try {
+            if (oldUrl != null && oldUrl.startsWith("/api/v1/images/")) {
+                // Extract path from URL
+                String[] parts = oldUrl.split("/");
+                if (parts.length >= 4) {
+                    String filename = parts[parts.length - 1];
+                    Path filePath = Paths.get(imageStoragePath, String.valueOf(newsArticleId), filename);
+                    if (Files.exists(filePath)) {
+                        Files.delete(filePath);
+                        log.info("Deleted old featured image file: {}", filePath);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to delete old featured image: {}", e.getMessage());
+            // Don't throw exception, just log warning
+        }
+    }
+
     private void validateImageFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_FILE);

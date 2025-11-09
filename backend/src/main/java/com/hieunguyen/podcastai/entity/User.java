@@ -1,19 +1,16 @@
 package com.hieunguyen.podcastai.entity;
 
 import com.hieunguyen.podcastai.entity.base.AuditableEntity;
-import com.hieunguyen.podcastai.enums.UserRole;
 import com.hieunguyen.podcastai.enums.UserStatus;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users", 
@@ -21,11 +18,11 @@ import java.util.List;
            @UniqueConstraint(columnNames = "email"),
            @UniqueConstraint(columnNames = "username")
        })
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 public class User extends AuditableEntity {
     
     @Column(name = "username", nullable = false, unique = true, length = 50)
@@ -53,10 +50,6 @@ public class User extends AuditableEntity {
     private String phoneNumber;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private UserRole role = UserRole.USER;
-    
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private UserStatus status = UserStatus.ACTIVE;
     
@@ -65,5 +58,18 @@ public class User extends AuditableEntity {
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserFavorite> favorites = new ArrayList<>();
+    
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    @Builder.Default
+    private Set<Role> roles = new HashSet<>();
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_tts_config_id")
+    private TtsConfig defaultTtsConfig;
     
 }

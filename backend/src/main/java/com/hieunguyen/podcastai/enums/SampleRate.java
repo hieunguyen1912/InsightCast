@@ -2,9 +2,8 @@ package com.hieunguyen.podcastai.enums;
 
 import lombok.Getter;
 
-/**
- * Sample rates supported by Google Cloud Text-to-Speech
- */
+import java.util.List;
+
 @Getter
 public enum SampleRate {
     RATE_8000(8000),
@@ -20,9 +19,6 @@ public enum SampleRate {
         this.hertz = hertz;
     }
 
-    /**
-     * Get SampleRate from hertz value
-     */
     public static SampleRate fromHertz(int hertz) {
         for (SampleRate rate : values()) {
             if (rate.hertz == hertz) {
@@ -32,11 +28,15 @@ public enum SampleRate {
         return null;
     }
 
-    /**
-     * Check if hertz value is valid
-     */
     public static boolean isValid(int hertz) {
         return fromHertz(hertz) != null;
     }
+
+    public static final List<Integer> VALID_SAMPLE_RATES = List.of(
+            RATE_8000.hertz, RATE_16000.hertz, RATE_22050.hertz, 
+            RATE_24000.hertz, RATE_44100.hertz, RATE_48000.hertz
+    );
+
+    public static final SampleRate DEFAULT = RATE_24000;
 }
 

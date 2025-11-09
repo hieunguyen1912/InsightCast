@@ -1,5 +1,6 @@
 package com.hieunguyen.podcastai.service;
 
+import com.hieunguyen.podcastai.dto.request.RolePermissionAssignmentRequest;
 import com.hieunguyen.podcastai.dto.response.PermissionDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +14,11 @@ public interface PermissionService {
     List<PermissionDto> getAllPermissions();
     
     PermissionDto getPermissionById(Long id);
-    
-    PermissionDto getPermissionByCode(String code);
+
+    List<PermissionDto> getRolePermissions(Long roleId);
+
+    PermissionDto assignPermissionToRole(Long roleId, RolePermissionAssignmentRequest request);
+
+    void revokePermissionFromRole(Long roleId, Long permissionId);
 }
 

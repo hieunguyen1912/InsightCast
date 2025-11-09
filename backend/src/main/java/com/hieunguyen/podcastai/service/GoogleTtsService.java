@@ -1,8 +1,10 @@
 package com.hieunguyen.podcastai.service;
 
 import com.hieunguyen.podcastai.dto.request.GoogleTtsRequest;
+import com.hieunguyen.podcastai.dto.request.LongAudioSynthesisRequest;
 import com.hieunguyen.podcastai.dto.request.VoiceSettingsRequest;
 import com.hieunguyen.podcastai.dto.response.GoogleTtsResponse;
+import com.hieunguyen.podcastai.dto.response.LongAudioSynthesisResponse;
 
 public interface GoogleTtsService {
 
@@ -15,4 +17,8 @@ public interface GoogleTtsService {
     boolean validateVoiceSettings(VoiceSettingsRequest voiceSettings);
 
     byte[] synthesizeAudioBytes(GoogleTtsRequest request);
+
+    LongAudioSynthesisResponse synthesizeLongAudio(LongAudioSynthesisRequest request);
+
+    LongAudioSynthesisResponse checkLongAudioOperationStatus(String operationName);
 }

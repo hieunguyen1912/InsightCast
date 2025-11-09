@@ -4,13 +4,11 @@ import com.hieunguyen.podcastai.dto.request.UserRoleAssignmentRequest;
 import com.hieunguyen.podcastai.dto.response.RoleDto;
 import com.hieunguyen.podcastai.entity.Role;
 import com.hieunguyen.podcastai.entity.User;
-import com.hieunguyen.podcastai.entity.UserRole;
 import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.exception.AppException;
+import com.hieunguyen.podcastai.mapper.RoleMapper;
 import com.hieunguyen.podcastai.repository.RoleRepository;
 import com.hieunguyen.podcastai.repository.UserRepository;
-import com.hieunguyen.podcastai.repository.UserRoleRepository;
-import com.hieunguyen.podcastai.service.RbacService;
 import com.hieunguyen.podcastai.service.UserRoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +25,7 @@ public class UserRoleServiceImpl implements UserRoleService {
     
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final UserRoleRepository userRoleRepository;
-    private final RbacService rbacService;
+    private final RoleMapper mapper;
     
     @Override
     @Transactional(readOnly = true)
@@ -38,11 +35,11 @@ public class UserRoleServiceImpl implements UserRoleService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         
-        List<Role> roles = rbacService.getUserRoles(user);
-        
-        return roles.stream()
-                .map(this::mapToDto)
+        List<Role> roles = user.getRoles().stream()
+                .filter(role -> Boolean.TRUE.equals(role.getIsActive()))
                 .collect(Collectors.toList());
+
+        return roles.stream().map(mapper::toRoleDto).toList();
     }
     
     @Override
@@ -56,40 +53,23 @@ public class UserRoleServiceImpl implements UserRoleService {
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
         
-        // Check if role is active
-        if (!role.getIsActive()) {
+        if (Boolean.FALSE.equals(role.getIsActive())) {
             log.warn("Cannot assign inactive role {} to user {}", role.getCode(), user.getEmail());
             throw new AppException(ErrorCode.ROLE_NOT_FOUND);
         }
         
         // Check if user already has this role
-        java.util.Optional<UserRole> existingUserRole = userRoleRepository.findByUserAndRole(user, role);
-        
-        if (existingUserRole.isPresent()) {
-            UserRole userRole = existingUserRole.get();
-            if (userRole.getIsActive()) {
-                log.info("User {} already has role {}, returning existing assignment", user.getEmail(), role.getCode());
-                return mapToDto(role);
-            } else {
-                // Reactivate the existing role assignment
-                userRole.setIsActive(true);
-                userRoleRepository.save(userRole);
-                log.info("Reactivated role {} for user {}", role.getCode(), user.getEmail());
-                return mapToDto(role);
-            }
+        if (user.getRoles().contains(role)) {
+            log.info("User {} already has role {}, returning existing assignment", user.getEmail(), role.getCode());
+            return mapper.toRoleDto(role);
         }
         
-        // Create new role assignment
-        UserRole userRole = UserRole.builder()
-                .user(user)
-                .role(role)
-                .isActive(true)
-                .build();
-        
-        userRoleRepository.save(userRole);
+        // Add role to user
+        user.getRoles().add(role);
+        userRepository.save(user);
         log.info("Successfully assigned role {} to user {}", role.getCode(), user.getEmail());
         
-        return mapToDto(role);
+        return mapper.toRoleDto(role);
     }
     
     @Override
@@ -103,24 +83,15 @@ public class UserRoleServiceImpl implements UserRoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
         
-        UserRole userRole = userRoleRepository.findByUserAndRole(user, role)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_ROLE_NOT_FOUND));
+        if (!user.getRoles().contains(role)) {
+            throw new AppException(ErrorCode.USER_ROLE_NOT_FOUND);
+        }
         
-        // Soft delete by setting isActive = false
-        userRole.setIsActive(false);
-        userRoleRepository.save(userRole);
+        user.getRoles().remove(role);
+        userRepository.save(user);
         
         log.info("Successfully revoked role {} from user {}", role.getCode(), user.getEmail());
     }
-    
-    private RoleDto mapToDto(Role role) {
-        return RoleDto.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .code(role.getCode())
-                .description(role.getDescription())
-                .isActive(role.getIsActive())
-                .build();
-    }
+
 }
 

@@ -1,15 +1,14 @@
 package com.hieunguyen.podcastai.entity;
 
 import com.hieunguyen.podcastai.entity.base.AuditableEntity;
+import com.hieunguyen.podcastai.entity.base.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "roles",
@@ -17,12 +16,12 @@ import java.util.List;
            @UniqueConstraint(columnNames = "name"),
            @UniqueConstraint(columnNames = "code")
        })
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class Role extends AuditableEntity {
+public class Role extends BaseEntity {
     
     @Column(name = "name", nullable = false, unique = true, length = 50)
     private String name;
@@ -37,12 +36,17 @@ public class Role extends AuditableEntity {
     @Builder.Default
     private Boolean isActive = true;
     
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     @Builder.Default
-    private List<UserRole> userRoles = new ArrayList<>();
+    private List<User> users = new ArrayList<>();
     
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "role_permissions",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
     @Builder.Default
-    private List<RolePermission> rolePermissions = new ArrayList<>();
+    private Set<Permission> permissions = new HashSet<>();
 }
 

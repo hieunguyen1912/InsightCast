@@ -27,5 +27,13 @@ public interface ImageService {
      * @param imageId Image ID
      */
     void deleteImage(Long imageId);
+    
+    /**
+     * Upload featured image for a news article
+     * @param newsArticleId News Article ID
+     * @param file MultipartFile image
+     * @return ImageResponseDto with the uploaded image URL
+     */
+    ImageResponseDto uploadFeaturedImage(Long newsArticleId, MultipartFile file);
 }
 

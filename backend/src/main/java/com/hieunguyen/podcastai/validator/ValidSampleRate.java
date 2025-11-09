@@ -7,7 +7,7 @@ import java.lang.annotation.*;
 
 /**
  * Validates that the sample rate is one of the supported values by Google Cloud TTS
- * Supported values: 8000, 16000, 22050, 24000, 44100, 48000
+ * Supported values: 8000, 16000, 22050, 24000, 44100, 48000 Hz
  */
 @Documented
 @Constraint(validatedBy = SampleRateValidator.class)

@@ -1,18 +1,21 @@
 package com.hieunguyen.podcastai.service;
 
 import com.hieunguyen.podcastai.dto.request.CreateArticleRequest;
+import com.hieunguyen.podcastai.dto.request.RejectArticleRequest;
 import com.hieunguyen.podcastai.dto.request.UpdateArticleRequest;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface ArticleService {
     
     // Create article (DRAFT status)
-    NewsArticleResponse createArticle(CreateArticleRequest request);
+    NewsArticleResponse createArticle(CreateArticleRequest request, MultipartFile featuredImage);
     
     // Get my articles by status
-    Page<NewsArticleResponse> getMyDrafts(Pageable pageable);
+    Page<NewsArticleSummaryResponse> getMyDrafts(Pageable pageable);
     
     Page<NewsArticleResponse> getMySubmitted(Pageable pageable);
     
@@ -26,12 +29,22 @@ public interface ArticleService {
     NewsArticleResponse getArticleById(Long id);
     
     // Update article (only DRAFT or REJECTED)
-    NewsArticleResponse updateArticle(Long id, UpdateArticleRequest request);
+    NewsArticleResponse updateArticle(Long id, UpdateArticleRequest request, MultipartFile featuredImage);
     
     // Delete article (only DRAFT)
     void deleteArticle(Long id);
     
     // Submit article for review (DRAFT -> PENDING_REVIEW)
     NewsArticleResponse submitForReview(Long id);
+    
+    // Admin methods
+    Page<NewsArticleSummaryResponse> getPendingReviewArticles(Pageable pageable);
+    
+    NewsArticleSummaryResponse approveArticle(Long id);
+    
+    NewsArticleSummaryResponse rejectArticle(Long id, RejectArticleRequest request);
+
+    Page<NewsArticleSummaryResponse> getArticlesByCategory(Long id, Pageable pageable);
+
 }
 

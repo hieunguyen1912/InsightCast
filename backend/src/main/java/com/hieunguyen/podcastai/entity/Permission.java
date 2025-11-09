@@ -1,12 +1,9 @@
 package com.hieunguyen.podcastai.entity;
 
 import com.hieunguyen.podcastai.entity.base.AuditableEntity;
+import com.hieunguyen.podcastai.entity.base.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,12 +14,12 @@ import java.util.List;
            @UniqueConstraint(columnNames = "name"),
            @UniqueConstraint(columnNames = "code")
        })
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class Permission extends AuditableEntity {
+public class Permission extends BaseEntity {
     
     @Column(name = "name", nullable = false, unique = true, length = 100)
     private String name;
@@ -43,8 +40,8 @@ public class Permission extends AuditableEntity {
     @Builder.Default
     private Boolean isActive = true;
     
-    @OneToMany(mappedBy = "permission", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToMany(mappedBy = "permissions")
     @Builder.Default
-    private List<RolePermission> rolePermissions = new ArrayList<>();
+    private List<Role> roles = new ArrayList<>();
 }
 

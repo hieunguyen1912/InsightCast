@@ -9,10 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Request DTO for Google Cloud Text-to-Speech Long Audio Synthesis
- * Supports up to 1MB of input text
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,14 +23,6 @@ public class LongAudioSynthesisRequest {
     @Valid
     private VoiceSettingsRequest voiceSettings;
 
-    /**
-     * Optional: Custom GCS bucket name. If not provided, uses default from configuration
-     */
-    private String outputGcsBucketName;
-
-    /**
-     * Optional: Custom file name in GCS. If not provided, generates automatically
-     */
     private String outputFileName;
 }
 

@@ -1,8 +1,10 @@
 package com.hieunguyen.podcastai.service.impl;
 
 import com.hieunguyen.podcastai.dto.request.CreateArticleRequest;
+import com.hieunguyen.podcastai.dto.request.RejectArticleRequest;
 import com.hieunguyen.podcastai.dto.request.UpdateArticleRequest;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.entity.Category;
 import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.entity.User;
@@ -13,6 +15,7 @@ import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.CategoryRepository;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.ArticleService;
+import com.hieunguyen.podcastai.service.ImageService;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 import com.hieunguyen.podcastai.util.SlugHelper;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Slf4j
@@ -33,13 +40,13 @@ public class ArticleServiceImpl implements ArticleService {
     private final CategoryRepository categoryRepository;
     private final NewsArticleMapper articleMapper;
     private final SecurityUtils securityUtils;
+    private final ImageService imageService;
 
     @Override
-    public NewsArticleResponse createArticle(CreateArticleRequest request) {
+    public NewsArticleResponse createArticle(CreateArticleRequest request, MultipartFile featuredImage) {
         User currentUser = securityUtils.getCurrentUser();
         log.info("Creating article with title: {} by user: {}", request.getTitle(), currentUser.getEmail());
         
-        // Get category
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
         
@@ -55,14 +62,14 @@ public class ArticleServiceImpl implements ArticleService {
         // Extract plain text from HTML content
         String plainText = Jsoup.parse(request.getContent()).text();
         
-        // Create article
+        // Create article first to get ID
         NewsArticle article = NewsArticle.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .content(request.getContent())
                 .plainText(plainText)
                 .slug(slug)
-                .featuredImage(request.getFeaturedImage())
+                .featuredImage(request.getFeaturedImage()) // Will be updated if file uploaded
                 .author(currentUser)
                 .category(category)
                 .status(ArticleStatus.DRAFT)
@@ -72,6 +79,18 @@ public class ArticleServiceImpl implements ArticleService {
                 .build();
         
         NewsArticle savedArticle = articleRepository.save(article);
+        
+        if (featuredImage != null && !featuredImage.isEmpty()) {
+            try {
+                var imageResponse = imageService.uploadFeaturedImage(savedArticle.getId(), featuredImage);
+                savedArticle.setFeaturedImage(imageResponse.getUrl());
+                savedArticle = articleRepository.save(savedArticle);
+                log.info("Featured image uploaded and set for article: {}", savedArticle.getId());
+            } catch (Exception e) {
+                log.error("Failed to upload featured image: {}", e.getMessage(), e);
+            }
+        }
+        
         log.info("Article created successfully with ID: {}", savedArticle.getId());
         
         return articleMapper.toDto(savedArticle);
@@ -79,14 +98,14 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<NewsArticleResponse> getMyDrafts(Pageable pageable) {
+    public Page<NewsArticleSummaryResponse> getMyDrafts(Pageable pageable) {
         User currentUser = securityUtils.getCurrentUser();
         log.info("Getting DRAFT articles for user: {}", currentUser.getEmail());
         
         Page<NewsArticle> articles = articleRepository.findByAuthorIdAndStatus(
                 currentUser.getId(), ArticleStatus.DRAFT, pageable);
         
-        return articles.map(articleMapper::toDto);
+        return articles.map(articleMapper::toSummaryDto);
     }
 
     @Override
@@ -154,7 +173,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
-    public NewsArticleResponse updateArticle(Long id, UpdateArticleRequest request) {
+    public NewsArticleResponse updateArticle(Long id, UpdateArticleRequest request, MultipartFile featuredImage) {
         User currentUser = securityUtils.getCurrentUser();
         log.info("Updating article with ID: {} by user: {}", id, currentUser.getEmail());
         
@@ -202,11 +221,19 @@ public class ArticleServiceImpl implements ArticleService {
             article.setCategory(category);
         }
         
-        if (request.getFeaturedImage() != null) {
-            article.setFeaturedImage(request.getFeaturedImage());
+        if (featuredImage != null && !featuredImage.isEmpty()) {
+            // Upload new file and set URL
+            try {
+                var imageResponse = imageService.uploadFeaturedImage(article.getId(), featuredImage);
+                article.setFeaturedImage(imageResponse.getUrl());
+                log.info("Featured image uploaded for article: {}", article.getId());
+            } catch (Exception e) {
+                log.error("Failed to upload featured image: {}", e.getMessage(), e);
+            }
+        } else if (request.getFeaturedImage() != null) {
+            article.setFeaturedImage(request.getFeaturedImage().isEmpty() ? null : request.getFeaturedImage());
         }
         
-        // If article was REJECTED, reset status to DRAFT
         if (article.getStatus() == ArticleStatus.REJECTED) {
             article.setStatus(ArticleStatus.DRAFT);
             article.setRejectionReason(null);
@@ -263,5 +290,73 @@ public class ArticleServiceImpl implements ArticleService {
         log.info("Article submitted for review successfully with ID: {}", updatedArticle.getId());
         
         return articleMapper.toDto(updatedArticle);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NewsArticleSummaryResponse> getPendingReviewArticles(Pageable pageable) {
+        log.info("Getting PENDING_REVIEW articles for admin");
+        
+        Page<NewsArticle> articles = articleRepository.findByStatus(ArticleStatus.PENDING_REVIEW, pageable);
+        
+        return articles.map(articleMapper::toSummaryDto);
+    }
+
+    @Override
+    public NewsArticleSummaryResponse approveArticle(Long id) {
+        log.info("Approving article with ID: {}", id);
+        
+        NewsArticle article = articleRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+        
+        // Can only approve PENDING_REVIEW articles
+        if (article.getStatus() != ArticleStatus.PENDING_REVIEW) {
+            throw new AppException(ErrorCode.ARTICLE_CANNOT_BE_APPROVED);
+        }
+        
+        article.setStatus(ArticleStatus.APPROVED);
+        article.setPublishedAt(Instant.now());
+        article.setRejectionReason(null);
+        
+        NewsArticle updatedArticle = articleRepository.save(article);
+        log.info("Article approved successfully with ID: {}", updatedArticle.getId());
+        
+        return articleMapper.toSummaryDto(updatedArticle);
+    }
+
+    @Override
+    public NewsArticleSummaryResponse rejectArticle(Long id, RejectArticleRequest request) {
+        log.info("Rejecting article with ID: {}", id);
+        
+        NewsArticle article = articleRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+        
+        // Can only reject PENDING_REVIEW articles
+        if (article.getStatus() != ArticleStatus.PENDING_REVIEW) {
+            throw new AppException(ErrorCode.ARTICLE_CANNOT_BE_REJECTED);
+        }
+        
+        article.setStatus(ArticleStatus.REJECTED);
+        article.setRejectionReason(request.getRejectionReason());
+        article.setPublishedAt(null);
+        
+        NewsArticle updatedArticle = articleRepository.save(article);
+        log.info("Article rejected successfully with ID: {}", updatedArticle.getId());
+        
+        return articleMapper.toSummaryDto(updatedArticle);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NewsArticleSummaryResponse> getArticlesByCategory(Long id, Pageable pageable) {
+        log.info("Getting articles for category with ID: {}", id);
+
+        // Verify category exists
+        if (!categoryRepository.existsById(id)) {
+            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+
+        Page<NewsArticle> articles = articleRepository.findByCategoryId(id, pageable);
+        return articles.map(articleMapper::toSummaryDto);
     }
 }

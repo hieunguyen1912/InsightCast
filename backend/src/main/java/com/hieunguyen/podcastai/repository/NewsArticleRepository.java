@@ -21,7 +21,7 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long>,
                     "WHERE to_tsvector('english', " +
                     "  COALESCE(n.title, '') || ' ' || " +
                     "  COALESCE(n.description, '') || ' ' || " +
-                    "  COALESCE(n.content, '')) " +
+                    "  COALESCE(n.plainText, '')) " +
                     "@@ plainto_tsquery('english', :keyword) " +
                     "AND (CAST(:categoryId AS BIGINT) IS NULL OR n.category_id = :categoryId) " +
                     "AND (CAST(:fromDate AS TIMESTAMP) IS NULL OR n.published_at >= :fromDate) " +
@@ -49,6 +49,9 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long>,
     Page<NewsArticle> findByAuthorIdAndStatus(Long authorId, ArticleStatus status, Pageable pageable);
     
     Page<NewsArticle> findByAuthorId(Long authorId, Pageable pageable);
+    
+    // Admin queries
+    Page<NewsArticle> findByStatus(ArticleStatus status, Pageable pageable);
     
     boolean existsBySlug(String slug);
     

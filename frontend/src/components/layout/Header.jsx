@@ -6,16 +6,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { Search, Menu, ChevronDown, User, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Search, Menu, ChevronDown, User, LogOut, FileText, Shield, ChevronRight } from 'lucide-react';
+import categoryService from '../../features/category/api';
 
 function Header() {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCategoriesMenuOpen, setIsCategoriesMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryTree, setCategoryTree] = useState([]);
+  const [expandedCategoriesArray, setExpandedCategoriesArray] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const userMenuRef = useRef(null);
+  const categoriesMenuRef = useRef(null);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -31,22 +37,129 @@ function Header() {
     navigate('/');
   };
 
-  // Close user menu when clicking outside
+  // Fetch category tree on mount
+  useEffect(() => {
+    const fetchCategoryTree = async () => {
+      setLoadingCategories(true);
+      try {
+        const result = await categoryService.getCategoryTree();
+        if (result.success) {
+          const categoryData = result.data?.data || result.data || [];
+          setCategoryTree(Array.isArray(categoryData) ? categoryData : []);
+        }
+      } catch (error) {
+        console.error('Error fetching category tree:', error);
+        setCategoryTree([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategoryTree();
+  }, []);
+
+  const toggleCategoryExpand = (categoryId) => {
+    setExpandedCategoriesArray(prev => {
+      const newArray = [...prev];
+      const index = newArray.indexOf(categoryId);
+      if (index > -1) {
+        newArray.splice(index, 1);
+      } else {
+        newArray.push(categoryId);
+      }
+      return newArray;
+    });
+  };
+
+  // Close user menu and categories menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
+      if (categoriesMenuRef.current && !categoriesMenuRef.current.contains(event.target)) {
+        setIsCategoriesMenuOpen(false);
+      }
     };
 
-    if (isUserMenuOpen) {
+    if (isUserMenuOpen || isCategoriesMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isUserMenuOpen]);
+  }, [isUserMenuOpen, isCategoriesMenuOpen]);
+
+  const handleCategoryClick = (categoryId, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setIsCategoriesMenuOpen(false);
+    navigate(`/category/${categoryId}`);
+  };
+
+  // Render category tree recursively
+  const renderCategoryTree = (categories, level = 0) => {
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return null;
+    }
+
+    return categories
+      .filter(cat => cat && cat.id && cat.isActive !== false)
+      .map((category) => {
+        const hasChildren = Array.isArray(category.children) && category.children.length > 0;
+        const isExpanded = expandedCategoriesArray.includes(category.id);
+
+        return (
+          <div key={category.id}>
+            <div
+              className="flex items-center justify-between group"
+              style={{ paddingLeft: `${8 + level * 16}px` }}
+            >
+              <div className="flex items-center flex-1 min-w-0">
+                {/* Expand/Collapse Icon */}
+                {hasChildren ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCategoryExpand(category.id);
+                    }}
+                    className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors"
+                    type="button"
+                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-3 w-3 text-gray-600" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-gray-600" />
+                    )}
+                  </button>
+                ) : (
+                  <div className="w-5 mr-2" /> // Spacer for alignment
+                )}
+
+                {/* Category Name */}
+                <button
+                  onClick={(e) => handleCategoryClick(category.id, e)}
+                  className="flex-1 text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors rounded"
+                  type="button"
+                >
+                  {category.name || 'Unnamed Category'}
+                </button>
+              </div>
+            </div>
+
+            {/* Children */}
+            {hasChildren && isExpanded && (
+              <div className="ml-2">
+                {renderCategoryTree(category.children, level + 1)}
+              </div>
+            )}
+          </div>
+        );
+      });
+  };
 
   return (
     <>
@@ -62,12 +175,46 @@ function Header() {
             </div>
             
             {/* Navigation */}
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden md:flex items-center space-x-8">
               <Link to="/" className="text-white hover:text-gray-300 transition-colors">Home</Link>
-              <Link to="/join" className="text-white hover:text-gray-300 transition-colors">Join Us</Link>
-              <Link to="/care" className="text-white hover:text-gray-300 transition-colors">Customer Care</Link>
-              <Link to="/contact" className="text-white hover:text-gray-300 transition-colors">Reach Out</Link>
-              <Link to="/about" className="text-white hover:text-gray-300 transition-colors">About Us</Link>
+              
+              {/* Categories Dropdown */}
+              <div className="relative" ref={categoriesMenuRef}>
+                <button
+                  onClick={() => setIsCategoriesMenuOpen(!isCategoriesMenuOpen)}
+                  className="flex items-center space-x-1 text-white hover:text-gray-300 transition-colors"
+                  type="button"
+                >
+                  <span>Categories</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isCategoriesMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Categories Dropdown Menu */}
+                {isCategoriesMenuOpen && (
+                  <div className="absolute left-0 mt-2 w-80 bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden z-50 max-h-96 overflow-y-auto">
+                    {loadingCategories ? (
+                      <div className="px-4 py-3 text-sm text-gray-600">Loading categories...</div>
+                    ) : categoryTree.length > 0 ? (
+                      <div className="py-2">
+                        {(() => {
+                          try {
+                            return renderCategoryTree(categoryTree);
+                          } catch (error) {
+                            console.error('Error rendering category tree:', error);
+                            return (
+                              <div className="px-4 py-3 text-sm text-red-600">
+                                Error loading categories. Please try again.
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-600">No categories available</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </nav>
             
             {/* User Menu / Auth Buttons */}
@@ -109,6 +256,24 @@ function Header() {
                       >
                         <User className="h-4 w-4 mr-3" />
                         Dashboard
+                      </Link>
+                      
+                      <Link
+                        to="/moderator"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        Moderator Panel
+                      </Link>
+                      
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <Shield className="h-4 w-4 mr-3" />
+                        Admin Panel
                       </Link>
                       
                       <button

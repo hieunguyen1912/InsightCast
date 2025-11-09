@@ -10,7 +10,6 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class NewsArticleSummaryResponse extends BaseNewsArticleResponse {
-
     private String categoryName;
-    private String newsSourceName;
+    private String authorName;
 }

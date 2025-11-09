@@ -49,15 +49,6 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("User fetched successfully", userDto));
     }
 
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable Long id) {
-        log.info("Getting user profile by ID: {}", id);
-        UserDto userDto = userService.getUserById(id);
-        log.info("Successfully retrieved user profile for user: {}", userDto.getEmail());
-        return ResponseEntity.ok(ApiResponse.success("User fetched successfully", userDto));
-    }
-
     @PutMapping("/me")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<UserDto>> updateProfile(@Valid @RequestBody UserUpdateRequest request) {

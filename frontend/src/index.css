@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @layer base {
   /* 
@@ -151,4 +151,120 @@ img {
 .article-card img {
   display: block;
   line-height: 0;
+}
+
+/* React Quill Custom Styles */
+.quill {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  padding: 12px;
+}
+
+.ql-container.ql-snow {
+  border: none;
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 400px;
+}
+
+.ql-editor {
+  min-height: 400px;
+  padding: 20px;
+  font-size: 16px;
+}
+
+.ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+  left: 20px;
+}
+
+.ql-editor p,
+.ql-editor ol,
+.ql-editor ul,
+.ql-editor pre,
+.ql-editor blockquote,
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3,
+.ql-editor h4,
+.ql-editor h5,
+.ql-editor h6 {
+  margin-bottom: 1em;
+}
+
+.ql-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.ql-editor blockquote {
+  border-left: 4px solid #f97316;
+  padding-left: 16px;
+  margin-left: 0;
+  color: #4b5563;
+}
+
+.ql-editor pre {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.ql-toolbar .ql-stroke {
+  stroke: #4b5563;
+}
+
+.ql-toolbar .ql-fill {
+  fill: #4b5563;
+}
+
+.ql-toolbar .ql-picker-label {
+  color: #4b5563;
+}
+
+.ql-toolbar button:hover,
+.ql-toolbar button:focus,
+.ql-toolbar button.ql-active,
+.ql-toolbar .ql-picker-label:hover,
+.ql-toolbar .ql-picker-label.ql-active,
+.ql-toolbar .ql-picker-item:hover,
+.ql-toolbar .ql-picker-item.ql-selected {
+  color: #f97316;
+}
+
+.ql-toolbar button:hover .ql-stroke,
+.ql-toolbar button:focus .ql-stroke,
+.ql-toolbar button.ql-active .ql-stroke,
+.ql-toolbar .ql-picker-label:hover .ql-stroke,
+.ql-toolbar .ql-picker-label.ql-active .ql-stroke {
+  stroke: #f97316;
+}
+
+.ql-toolbar button:hover .ql-fill,
+.ql-toolbar button:focus .ql-fill,
+.ql-toolbar button.ql-active .ql-fill,
+.ql-toolbar .ql-picker-label:hover .ql-fill,
+.ql-toolbar .ql-picker-label.ql-active .ql-fill {
+  fill: #f97316;
+}
+
+/* Disabled state for Quill editor */
+.ql-container.ql-disabled .ql-editor {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ql-toolbar.ql-snow button.ql-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

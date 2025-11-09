@@ -12,9 +12,8 @@ import lombok.experimental.SuperBuilder;
 public class NewsArticleResponse extends BaseNewsArticleResponse {
 
     private String content;
-
+    private UserDto author;
     private CategoryResponse category;
-    private NewsSourceResponse newsSource;
 
     @Data
     @SuperBuilder
@@ -23,14 +22,5 @@ public class NewsArticleResponse extends BaseNewsArticleResponse {
         private Long id;
         private String name;
         private String description;
-    }
-
-    @Data
-    @SuperBuilder
-    @NoArgsConstructor
-    public static class NewsSourceResponse {
-        private Long id;
-        private String name;
-        private String displayName;
     }
 }

@@ -4,7 +4,7 @@ import com.hieunguyen.podcastai.dto.request.CategoryRequest;
 import com.hieunguyen.podcastai.dto.request.CategoryUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.BreadcrumbDto;
 import com.hieunguyen.podcastai.dto.response.CategoryDto;
-import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
+import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -34,6 +34,5 @@ public interface CategoryService {
     
     List<BreadcrumbDto> getCategoryBreadcrumb(Long id);
     
-    Page<NewsArticleResponse> getArticlesByCategory(Long id, Pageable pageable);
 }
 

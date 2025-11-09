@@ -1,27 +1,26 @@
 package com.hieunguyen.podcastai.dto.request;
 
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.hieunguyen.podcastai.enums.AudioEncoding;
+import com.hieunguyen.podcastai.enums.SampleRate;
+import com.hieunguyen.podcastai.validator.ValidAudioEncoding;
+import com.hieunguyen.podcastai.validator.ValidSampleRate;
+import jakarta.validation.constraints.*;
+import lombok.*;
 
-/**
- * Voice settings for Google Cloud Text-to-Speech
- */
-@Data
+
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class VoiceSettingsRequest {
 
     @NotBlank(message = "Language code cannot be blank")
+    @Size(max = 10, message = "Language code must not exceed 10 characters")
+    @Pattern(regexp = "^[a-z]{2}-[A-Z]{2}$", message = "Language code must be in format 'xx-XX' (e.g., en-US, vi-VN)")
     private String languageCode;
 
     @NotBlank(message = "Voice name cannot be blank")
+    @Size(max = 50, message = "Voice name must not exceed 50 characters")
     private String voiceName;
 
     @NotNull(message = "Speaking rate cannot be null")
@@ -39,9 +38,11 @@ public class VoiceSettingsRequest {
     @DecimalMax(value = "16.0", message = "Volume gain must not exceed 16.0")
     private Double volumeGain;
 
+    @ValidAudioEncoding
     @Builder.Default
-    private String audioEncoding = "MP3";
+    private AudioEncoding audioEncoding = AudioEncoding.MP3;
 
+    @ValidSampleRate
     @Builder.Default
-    private Integer sampleRateHertz = 24000;
+    private SampleRate sampleRateHertz = SampleRate.DEFAULT;
 }

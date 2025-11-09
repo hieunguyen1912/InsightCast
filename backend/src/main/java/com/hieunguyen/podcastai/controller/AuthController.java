@@ -2,10 +2,7 @@ package com.hieunguyen.podcastai.controller;
 
 import com.hieunguyen.podcastai.dto.request.user.UserLoginRequest;
 import com.hieunguyen.podcastai.dto.request.user.UserRegisterRequest;
-import com.hieunguyen.podcastai.dto.response.ApiResponse;
-import com.hieunguyen.podcastai.dto.response.TokenDto;
-import com.hieunguyen.podcastai.dto.response.UserLoginResponse;
-import com.hieunguyen.podcastai.dto.response.UserRegisterResponse;
+import com.hieunguyen.podcastai.dto.response.*;
 import com.hieunguyen.podcastai.entity.User;
 import com.hieunguyen.podcastai.service.AuthService;
 import com.hieunguyen.podcastai.util.SecurityUtils;
@@ -51,10 +48,10 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserRegisterResponse>> register(@Valid @RequestBody UserRegisterRequest request) {
+    public ResponseEntity<ApiResponse<UserDto>> register(@Valid @RequestBody UserRegisterRequest request) {
         
         log.info("User registration request received for email: {}", request.getEmail());
-        UserRegisterResponse response = authService.register(request);  
+        UserDto response = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 

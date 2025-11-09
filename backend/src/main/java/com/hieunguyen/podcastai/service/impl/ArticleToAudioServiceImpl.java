@@ -1,7 +1,11 @@
 package com.hieunguyen.podcastai.service.impl;
 
-import com.hieunguyen.podcastai.dto.request.GoogleTtsRequest;
+import com.hieunguyen.podcastai.dto.request.AudioRequest;
+import com.hieunguyen.podcastai.dto.request.LongAudioSynthesisRequest;
 import com.hieunguyen.podcastai.dto.request.VoiceSettingsRequest;
+import com.hieunguyen.podcastai.dto.response.AudioFileDto;
+import com.hieunguyen.podcastai.dto.response.AudioGenerationStatusDto;
+import com.hieunguyen.podcastai.dto.response.LongAudioSynthesisResponse;
 import com.hieunguyen.podcastai.entity.AudioFile;
 import com.hieunguyen.podcastai.entity.NewsArticle;
 import com.hieunguyen.podcastai.entity.TtsConfig;
@@ -9,20 +13,25 @@ import com.hieunguyen.podcastai.entity.User;
 import com.hieunguyen.podcastai.enums.ErrorCode;
 import com.hieunguyen.podcastai.enums.ProcessingStatus;
 import com.hieunguyen.podcastai.exception.AppException;
+import com.hieunguyen.podcastai.mapper.AudioMapper;
+import com.hieunguyen.podcastai.mapper.TtsConfigMapper;
 import com.hieunguyen.podcastai.repository.AudioRepository;
+import com.hieunguyen.podcastai.repository.NewsArticleRepository;
+import com.hieunguyen.podcastai.repository.UserRepository;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.Storage;
 import com.hieunguyen.podcastai.service.ArticleToAudioService;
-import com.hieunguyen.podcastai.service.AudioStorageService;
 import com.hieunguyen.podcastai.service.GoogleTtsService;
 import com.hieunguyen.podcastai.util.ArticleToSsmlConverter;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
+import java.nio.channels.Channels;
 import java.time.Instant;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -30,273 +39,384 @@ import java.util.UUID;
 @Transactional
 public class ArticleToAudioServiceImpl implements ArticleToAudioService {
     
-    private final GoogleTtsService googleTtsService;
-    private final AudioStorageService audioStorageService;
     private final AudioRepository audioRepository;
-    private final ArticleToSsmlConverter ssmlConverter;
+    private final NewsArticleRepository articleRepository;
+    private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
-    
-    private static final int MAX_SSML_LENGTH = 5000;
-    
+    private final TtsConfigMapper ttsConfigMapper;
+    private final GoogleTtsService googleTtsService;
+    private final ArticleToSsmlConverter articleToSsmlConverter;
+    private final Storage storage;
+    private final AudioMapper audioMapper;
+
     @Override
-    public AudioFile convertArticleToAudio(NewsArticle article, TtsConfig ttsConfig) {
-        log.info("Converting article {} to audio", article.getId());
-        
-        // Get voice settings from TTS config or use default
-        VoiceSettingsRequest voiceSettings = getVoiceSettings(ttsConfig);
-        
-        // Create AudioFile entity
-        AudioFile audioFile = createPendingAudioFile(article, ttsConfig);
-        
-        try {
-            // Update status to GENERATING_AUDIO
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.GENERATING_AUDIO, null);
-            
-            // Perform audio conversion
-            performAudioConversion(audioFile, article, voiceSettings);
-            
-            // Update status to COMPLETED
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.COMPLETED, null);
-            
-            log.info("Successfully converted article {} to audio file: {}", 
-                    article.getId(), audioFile.getFileName());
-            
-            return audioFile;
-            
-        } catch (Exception e) {
-            log.error("Failed to convert article {} to audio: {}", 
-                    article.getId(), e.getMessage(), e);
-            
-            // Update status to FAILED with error message
-            String errorMessage = e.getMessage();
-            String errorCode = extractErrorCode(e);
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.FAILED, errorMessage);
-            
-            // Update error code
-            audioFile = audioRepository.findById(audioFile.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.AUDIO_FILE_NOT_FOUND));
-            audioFile.setErrorCode(errorCode);
-            audioRepository.save(audioFile);
-            
-            throw new RuntimeException("Failed to convert article to audio", e);
+    public AudioFileDto generateAudioFromArticle(Long articleId, AudioRequest request) {
+        log.info("Generating audio for article: {} with config: {}", articleId, 
+                request.getCustomVoiceSettings() != null ? "custom" : "default");
+
+        // 1. Get current user
+        User currentUser = securityUtils.getCurrentUser();
+
+        // 2. Find and validate article
+        NewsArticle article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+
+        // Validate ownership
+        if (!article.getAuthor().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
         }
+
+        VoiceSettingsRequest voiceSettings = resolveVoiceSettings(request, currentUser);
+        
+        // 4. Convert article to SSML
+        String ssmlContent = articleToSsmlConverter.convertToSsml(article.getContent(), article.getTitle());
+        
+        // 5. Generate file name (use same name for both GCS and database)
+        String fileName = generateAudioFileName(article, voiceSettings);
+        
+        // 6. Generate audio using Google TTS Long Audio Synthesis
+        LongAudioSynthesisRequest longAudioSynthesisRequest = LongAudioSynthesisRequest.builder()
+                .text(ssmlContent)
+                .voiceSettings(voiceSettings)
+                .outputFileName(fileName)
+                .build();
+        
+        LongAudioSynthesisResponse synthesisResponse = googleTtsService.synthesizeLongAudio(longAudioSynthesisRequest);
+        
+        // 7. Create AudioFile entity with operation info
+        AudioFile audioFile = AudioFile.builder()
+                .newsArticle(article)
+                .user(currentUser)
+                .fileName(fileName)
+                .status(ProcessingStatus.GENERATING_AUDIO)
+                .operationName(synthesisResponse.getOperationName())
+                .gcsUri(synthesisResponse.getOutputGcsUri())
+                .ttsConfig(getTtsConfigFromRequest(request, currentUser))
+                .build();
+        
+        // Save to database
+        AudioFile savedAudioFile = audioRepository.save(audioFile);
+        
+        log.info("Long audio synthesis started for article: {}, operation: {}, audio file ID: {}", 
+                articleId, synthesisResponse.getOperationName(), savedAudioFile.getId());
+        
+        
+        return audioMapper.toDto(savedAudioFile);
     }
-    
-    @Override
-    @Async("ttsTaskExecutor")
-    public void convertArticleToAudioAsync(NewsArticle article, TtsConfig ttsConfig) {
-        log.info("Starting async audio conversion for article: {}", article.getId());
-        
-        // Get the audio file that was created with PENDING status
-        AudioFile audioFile = audioRepository.findFirstByNewsArticleOrderByCreatedAtDesc(article)
-                .orElseThrow(() -> new AppException(ErrorCode.AUDIO_FILE_NOT_FOUND));
-        
-        try {
-            // Update status to GENERATING_AUDIO
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.GENERATING_AUDIO, null);
-            
-            // Get voice settings
-            VoiceSettingsRequest voiceSettings = getVoiceSettings(ttsConfig);
-            
-            // Perform audio conversion
-            performAudioConversion(audioFile, article, voiceSettings);
-            
-            // Update status to COMPLETED
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.COMPLETED, null);
-            
-            log.info("Successfully completed async audio conversion for article: {}", article.getId());
-            
-        } catch (Exception e) {
-            log.error("Failed async audio conversion for article {}: {}", 
-                    article.getId(), e.getMessage(), e);
-            
-            // Update status to FAILED with error message
-            String errorMessage = e.getMessage();
-            String errorCode = extractErrorCode(e);
-            updateAudioFileStatus(audioFile.getId(), ProcessingStatus.FAILED, errorMessage);
-            
-            // Update error code and retry count
-            audioFile = audioRepository.findById(audioFile.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.AUDIO_FILE_NOT_FOUND));
-            audioFile.setErrorCode(errorCode);
-            audioFile.setRetryCount(audioFile.getRetryCount() + 1);
-            audioRepository.save(audioFile);
+
+    private VoiceSettingsRequest resolveVoiceSettings(AudioRequest request, User user) {
+        // Priority 1: Custom voice settings
+        if (request.getCustomVoiceSettings() != null) {
+            log.debug("Using custom voice settings from request");
+            return request.getCustomVoiceSettings();
         }
+        
+        // Priority 2: Default TTS Config from user
+        log.debug("Using default TTS config from user");
+
+
+        TtsConfig defaultTtsConfig = user.getDefaultTtsConfig();
+        
+        if ( defaultTtsConfig != null) {
+            log.debug("Found default TTS config: {}", defaultTtsConfig.getId());
+            return ttsConfigMapper.toVoiceSettingsRequest(defaultTtsConfig);
+        }
+        
+        // No default config found
+        log.warn("No default TTS config found for user: {}", user.getId());
+        throw new AppException(ErrorCode.TTS_CONFIG_NO_DEFAULT);
     }
+
     
+    private TtsConfig getTtsConfigFromRequest(AudioRequest request, User user) {
+        // If using custom settings, return null (no config entity)
+        if (request.getCustomVoiceSettings() != null) {
+            return null;
+        }
+        
+        // Otherwise, return user's default config
+        User userWithConfig = userRepository.findByIdWithDefaultTtsConfig(user.getId())
+                .orElse(user);
+        return userWithConfig.getDefaultTtsConfig();
+    }
+
     @Override
-    public AudioFile createPendingAudioFile(NewsArticle article, TtsConfig ttsConfig) {
+    public AudioGenerationStatusDto checkAndUpdateAudioGenerationStatus(Long audioFileId) {
+        log.info("Checking audio generation status for audio file ID: {}", audioFileId);
+        
+        // 1. Get current user and validate
         User currentUser = securityUtils.getCurrentUser();
         
-        AudioFile audioFile = AudioFile.builder()
-                .title(article.getTitle())
-                .description(article.getDescription())
-                .sourceUrl(null) // Can be set if article has URL
-                .user(currentUser)
-                .newsArticle(article)
-                .ttsConfig(ttsConfig)
-                .status(ProcessingStatus.PENDING)
-                .errorMessage(null)
-                .errorCode(null)
-                .retryCount(0)
-                .build();
+        // 2. Find audio file
+        AudioFile audioFile = audioRepository.findById(audioFileId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
         
-        return audioRepository.save(audioFile);
+        // Validate ownership
+        if (!audioFile.getUser().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+        
+        // 3. Check if already completed or failed
+        if (audioFile.getStatus() == ProcessingStatus.COMPLETED) {
+            log.info("Audio file {} is already completed", audioFileId);
+            return AudioGenerationStatusDto.builder()
+                    .audioFileId(audioFileId)
+                    .status(ProcessingStatus.COMPLETED)
+                    .build();
+        }
+        
+        if (audioFile.getStatus() == ProcessingStatus.FAILED) {
+            log.info("Audio file {} has failed", audioFileId);
+            return AudioGenerationStatusDto.builder()
+                    .audioFileId(audioFileId)
+                    .status(ProcessingStatus.FAILED)
+                    .errorMessage(audioFile.getErrorMessage())
+                    .build();
+        }
+        
+        // 4. Check if operation name exists
+        if (audioFile.getOperationName() == null || audioFile.getOperationName().isEmpty()) {
+            log.error("Audio file {} does not have operation name", audioFileId);
+            audioFile.setStatus(ProcessingStatus.FAILED);
+            audioFile.setErrorMessage("Operation name not found");
+            audioRepository.save(audioFile);
+            return AudioGenerationStatusDto.builder()
+                    .audioFileId(audioFileId)
+                    .status(ProcessingStatus.FAILED)
+                    .errorMessage("Operation name not found")
+                    .build();
+        }
+        
+        // 5. Check operation status from Google Cloud
+        try {
+            LongAudioSynthesisResponse statusResponse = googleTtsService.checkLongAudioOperationStatus(
+                    audioFile.getOperationName());
+            
+            log.info("Operation status for {}: done={}, progress={}%", 
+                    audioFile.getOperationName(), statusResponse.getDone(), statusResponse.getProgressPercentage());
+            
+            // 6. If operation is done
+            if (Boolean.TRUE.equals(statusResponse.getDone())) {
+                // Check for errors
+                if (statusResponse.getErrorMessage() != null) {
+                    log.error("Audio synthesis failed for {}: {}", audioFileId, statusResponse.getErrorMessage());
+                    audioFile.setStatus(ProcessingStatus.FAILED);
+                    audioFile.setErrorMessage(statusResponse.getErrorMessage());
+                    audioRepository.save(audioFile);
+                    return AudioGenerationStatusDto.builder()
+                            .audioFileId(audioFileId)
+                            .status(ProcessingStatus.FAILED)
+                            .errorMessage(statusResponse.getErrorMessage())
+                            .build();
+                }
+                
+                // Update status to completed (file is available in GCS, no need to download)
+                audioFile.setStatus(ProcessingStatus.COMPLETED);
+                if (statusResponse.getOutputGcsUri() != null) {
+                    audioFile.setGcsUri(statusResponse.getOutputGcsUri());
+                }
+                audioRepository.save(audioFile);
+                
+                log.info("Audio synthesis completed for {}, file available at GCS: {}", 
+                        audioFileId, audioFile.getGcsUri());
+                
+                return AudioGenerationStatusDto.builder()
+                        .audioFileId(audioFileId)
+                        .status(ProcessingStatus.COMPLETED)
+                        .progressPercentage(100.0)
+                        .build();
+            } else {
+                // Operation still in progress
+                log.debug("Audio synthesis still in progress for {}: {}%", 
+                        audioFileId, statusResponse.getProgressPercentage());
+                
+                return AudioGenerationStatusDto.builder()
+                        .audioFileId(audioFileId)
+                        .status(ProcessingStatus.GENERATING_AUDIO)
+                        .progressPercentage(statusResponse.getProgressPercentage())
+                        .build();
+            }
+            
+        } catch (Exception e) {
+            log.error("Failed to check operation status for {}: {}", audioFileId, e.getMessage(), e);
+            audioFile.setStatus(ProcessingStatus.FAILED);
+            audioFile.setErrorMessage("Failed to check operation status: " + e.getMessage());
+            audioRepository.save(audioFile);
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
+    }
+    
+
+    public InputStream getAudioStreamFromGcs(String gcsUri) {
+        if (gcsUri == null || !gcsUri.startsWith("gs://")) {
+            throw new IllegalArgumentException("Invalid GCS URI: " + gcsUri);
+        }
+        
+        String[] parts = parseGcsUri(gcsUri);
+        String bucketName = parts[0];
+        String objectName = parts[1];
+        
+        log.info("Streaming audio from GCS: bucket={}, object={}", bucketName, objectName);
+        
+        try {
+            Blob blob = storage.get(bucketName, objectName);
+            
+            if (blob == null) {
+                throw new RuntimeException("File not found in GCS: " + gcsUri);
+            }
+            
+            // Use reader() for streaming instead of getContent() which loads all into memory
+            return Channels.newInputStream(blob.reader());
+            
+        } catch (Exception e) {
+            log.error("Failed to stream from GCS: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
+    }
+
+    public byte[] getAudioBytesFromGcs(String gcsUri) {
+        if (gcsUri == null || !gcsUri.startsWith("gs://")) {
+            throw new IllegalArgumentException("Invalid GCS URI: " + gcsUri);
+        }
+        
+        String[] parts = parseGcsUri(gcsUri);
+        String bucketName = parts[0];
+        String objectName = parts[1];
+        
+        log.info("Downloading audio from GCS: bucket={}, object={}", bucketName, objectName);
+        
+        try {
+            Blob blob = storage.get(bucketName, objectName);
+            
+            if (blob == null) {
+                throw new RuntimeException("File not found in GCS: " + gcsUri);
+            }
+            
+            byte[] content = blob.getContent();
+            log.info("Successfully downloaded {} bytes from GCS", content.length);
+            
+            return content;
+            
+        } catch (Exception e) {
+            log.error("Failed to download from GCS: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to download from GCS: " + e.getMessage(), e);
+        }
+    }
+
+    private String[] parseGcsUri(String gcsUri) {
+        String[] parts = gcsUri.replace("gs://", "").split("/", 2);
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Invalid GCS URI format: " + gcsUri);
+        }
+        return parts;
     }
     
     @Override
-    @Transactional
-    public void updateAudioFileStatus(Long audioFileId, ProcessingStatus status, String errorMessage) {
+    public InputStream getAudioStream(Long audioFileId) {
+        log.info("Getting audio stream for audio file ID: {}", audioFileId);
+        
+        User currentUser = securityUtils.getCurrentUser();
         AudioFile audioFile = audioRepository.findById(audioFileId)
-                .orElseThrow(() -> new AppException(ErrorCode.AUDIO_FILE_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
         
-        audioFile.setStatus(status);
-        audioFile.setErrorMessage(errorMessage);
-        
-        if (status == ProcessingStatus.FAILED && errorMessage != null) {
-            // Extract error code if possible
-            audioFile.setErrorCode(extractErrorCodeFromMessage(errorMessage));
-        } else if (status == ProcessingStatus.COMPLETED) {
-            // Clear error fields on success
-            audioFile.setErrorMessage(null);
-            audioFile.setErrorCode(null);
+        if (!audioFile.getUser().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
         }
         
-        audioRepository.save(audioFile);
-        log.debug("Updated audio file {} status to {}", audioFileId, status);
+        if (audioFile.getStatus() != ProcessingStatus.COMPLETED) {
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
+        
+        if (audioFile.getGcsUri() == null || audioFile.getGcsUri().isEmpty()) {
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
+        
+        return getAudioStreamFromGcs(audioFile.getGcsUri());
     }
-    
-    /**
-     * Perform the actual audio conversion
-     */
-    private void performAudioConversion(AudioFile audioFile, NewsArticle article, VoiceSettingsRequest voiceSettings) {
-        // Convert article content to SSML
-        String ssml = ssmlConverter.convertToSsml(article.getContent(), article.getTitle());
+
+    @Override
+    public byte[] getAudioBytes(Long audioFileId) {
+        log.info("Getting audio bytes for audio file ID: {}", audioFileId);
         
-        byte[] audioBytes;
+        User currentUser = securityUtils.getCurrentUser();
+        AudioFile audioFile = audioRepository.findById(audioFileId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
         
-        if (ssml.length() > MAX_SSML_LENGTH) {
-            log.info("Article content exceeds SSML limit ({} chars), using plainText chunking", ssml.length());
-            audioBytes = googleTtsService.synthesizeLongTextInChunks(
-                article.getPlainText(), voiceSettings);
-        } else {
-            log.info("Using SSML synthesis for article ({} chars)", ssml.length());
-            GoogleTtsRequest request = GoogleTtsRequest.builder()
-                    .text(ssml)
-                    .voiceSettings(voiceSettings)
-                    .build();
-            
-            audioBytes = googleTtsService.synthesizeSsml(request);
+        if (!audioFile.getUser().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
         }
         
-        // Generate filename
-        String fileName = generateAudioFileName(voiceSettings.getAudioEncoding());
-        audioFile.setFileName(fileName);
+        if (audioFile.getStatus() != ProcessingStatus.COMPLETED) {
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
         
-        // Store audio file
-        String filePath = audioStorageService.storeAudioFile(audioFile, audioBytes);
-        audioFile.setFilePath(filePath);
-        audioFile.setFileSizeBytes((long) audioBytes.length);
-        audioFile.setPublishedAt(Instant.now());
+        if (audioFile.getGcsUri() == null || audioFile.getGcsUri().isEmpty()) {
+            throw new AppException(ErrorCode.AUDIO_FILE_PROCESSING_FAILED);
+        }
         
-        audioRepository.save(audioFile);
+        return getAudioBytesFromGcs(audioFile.getGcsUri());
     }
-    
-    /**
-     * Get voice settings from TTS config or use defaults
-     */
-    private VoiceSettingsRequest getVoiceSettings(TtsConfig ttsConfig) {
-        if (ttsConfig != null) {
-            return VoiceSettingsRequest.builder()
-                    .languageCode(ttsConfig.getLanguageCode())
-                    .voiceName(ttsConfig.getVoiceName())
-                    .speakingRate(ttsConfig.getSpeakingRate())
-                    .pitch(ttsConfig.getPitch())
-                    .volumeGain(ttsConfig.getVolumeGainDb())
-                    .audioEncoding(ttsConfig.getAudioEncoding())
-                    .sampleRateHertz(ttsConfig.getSampleRateHertz())
-                    .build();
+
+    @Override
+    public void deleteAudioFile(Long audioFileId) {
+        log.info("Deleting audio file ID: {}", audioFileId);
+        
+        User currentUser = securityUtils.getCurrentUser();
+        
+        AudioFile audioFile = audioRepository.findById(audioFileId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+        
+        if (!audioFile.getUser().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        // 3. Check if operation is still running - cannot delete if TTS is still processing
+        if (audioFile.getOperationName() != null && !audioFile.getOperationName().isEmpty()) {
+            try {
+                LongAudioSynthesisResponse statusResponse = googleTtsService.checkLongAudioOperationStatus(
+                        audioFile.getOperationName());
+                
+                if (!Boolean.TRUE.equals(statusResponse.getDone())) {
+                    throw new AppException(ErrorCode.AUDIO_FILE_CANNOT_BE_DELETED);
+                }
+            } catch (Exception e) {
+                if (audioFile.getStatus() == ProcessingStatus.GENERATING_AUDIO) {
+                    throw new AppException(ErrorCode.AUDIO_FILE_CANNOT_BE_DELETED);
+                }
+            }
         }
         
-        // Default settings
-        return VoiceSettingsRequest.builder()
-                .languageCode("vi-VN")
-                .voiceName("vi-VN-Standard-A")
-                .speakingRate(1.0)
-                .pitch(0.0)
-                .volumeGain(0.0)
-                .audioEncoding("MP3")
-                .sampleRateHertz(24000)
-                .build();
+        if (audioFile.getStatus() == ProcessingStatus.GENERATING_AUDIO) {
+            log.warn("Cannot delete audio file {} - status is GENERATING_AUDIO", audioFileId);
+            throw new AppException(ErrorCode.AUDIO_FILE_CANNOT_BE_DELETED);
+        }
+        
+        if (audioFile.getGcsUri() != null && !audioFile.getGcsUri().isEmpty()) {
+            try {
+                String[] parts = parseGcsUri(audioFile.getGcsUri());
+                String bucketName = parts[0];
+                String objectName = parts[1];
+                storage.delete(bucketName, objectName);
+            } catch (Exception e) {
+                log.warn("Failed to delete file from GCS {}: {}. Continuing with database deletion.", 
+                        audioFile.getGcsUri(), e.getMessage());
+            }
+        }
+        
+        audioRepository.delete(audioFile);
+        log.info("Successfully deleted audio file ID: {}", audioFileId);
     }
-    
-    /**
-     * Generate audio file name
-     */
-    private String generateAudioFileName(String audioEncoding) {
-        String extension = audioEncoding.toLowerCase();
-        if (extension.equals("mp3")) {
-            extension = "mp3";
-        } else if (extension.equals("wav")) {
-            extension = "wav";
-        } else if (extension.equals("ogg")) {
-            extension = "ogg";
-        } else if (extension.equals("flac")) {
-            extension = "flac";
-        } else {
-            extension = "mp3";
-        }
-        
-        return String.format("article_audio_%s.%s", UUID.randomUUID().toString(), extension);
-    }
-    
-    /**
-     * Extract error code from exception
-     */
-    private String extractErrorCode(Exception e) {
-        String message = e.getMessage();
-        if (message == null) {
-            return "UNKNOWN_ERROR";
-        }
-        
-        String lowerMessage = message.toLowerCase();
-        if (lowerMessage.contains("quota") || lowerMessage.contains("limit")) {
-            return "QUOTA_EXCEEDED";
-        } else if (lowerMessage.contains("timeout")) {
-            return "TIMEOUT";
-        } else if (lowerMessage.contains("invalid")) {
-            return "INVALID_INPUT";
-        } else if (lowerMessage.contains("network") || lowerMessage.contains("connection")) {
-            return "NETWORK_ERROR";
-        } else if (lowerMessage.contains("permission") || lowerMessage.contains("access")) {
-            return "PERMISSION_DENIED";
-        } else {
-            return "UNKNOWN_ERROR";
-        }
-    }
-    
-    /**
-     * Extract error code from error message
-     */
-    private String extractErrorCodeFromMessage(String errorMessage) {
-        if (errorMessage == null) {
-            return "UNKNOWN_ERROR";
-        }
-        
-        String lowerMessage = errorMessage.toLowerCase();
-        if (lowerMessage.contains("quota") || lowerMessage.contains("limit")) {
-            return "QUOTA_EXCEEDED";
-        } else if (lowerMessage.contains("timeout")) {
-            return "TIMEOUT";
-        } else if (lowerMessage.contains("invalid")) {
-            return "INVALID_INPUT";
-        } else if (lowerMessage.contains("network") || lowerMessage.contains("connection")) {
-            return "NETWORK_ERROR";
-        } else if (lowerMessage.contains("permission") || lowerMessage.contains("access")) {
-            return "PERMISSION_DENIED";
-        } else {
-            return "UNKNOWN_ERROR";
-        }
+
+    private String generateAudioFileName(NewsArticle article, VoiceSettingsRequest voiceSettings) {
+        String timestamp = String.valueOf(Instant.now().toEpochMilli());
+        String sanitizedTitle = article.getTitle()
+                .replaceAll("[^a-zA-Z0-9\\s]", "")
+                .replaceAll("\\s+", "-")
+                .toLowerCase();
+        return String.format("%s-%s-%s.wav", 
+                sanitizedTitle.substring(0, Math.min(50, sanitizedTitle.length())),
+                voiceSettings.getVoiceName().replace("-", "_"),
+                timestamp);
     }
 }
 

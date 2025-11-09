@@ -3,16 +3,39 @@
  * Black footer with newsletter subscription and category links
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import categoryService from '../../features/category/api';
 
 function Footer() {
   const currentYear = new Date().getFullYear();
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoading(true);
+      try {
+        const result = await categoryService.getRootCategories();
+        if (result.success) {
+          const categoryData = result.data?.data || result.data || [];
+          setCategories(Array.isArray(categoryData) ? categoryData.filter(cat => cat.isActive !== false) : []);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   return (
     <footer className="bg-black text-white py-12" role="contentinfo">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Logo and Description */}
           <div className="lg:col-span-2">
             <h3 className="text-2xl font-bold mb-4">LET'S READ</h3>
@@ -34,40 +57,42 @@ function Footer() {
             </div>
           </div>
           
-          {/* Footer Links */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">HOME</h4>
-            <ul className="space-y-2 text-gray-300">
-              <li><a href="#" className="hover:text-white transition-colors">News</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">U.S.</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Politics</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">World</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Health</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Business</a></li>
-            </ul>
-          </div>
+          {/* Categories Links */}
+          {categories.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold">CATEGORIES</h4>
+              <ul className="space-y-2 text-gray-300">
+                {categories.slice(0, 8).map((category) => (
+                  <li key={category.id}>
+                    <Link 
+                      to={`/category/${category.id}`}
+                      className="hover:text-white transition-colors"
+                    >
+                      {category.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           
+          {/* Quick Links */}
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold">ENTERTAINMENT</h4>
+            <h4 className="text-lg font-semibold">QUICK LINKS</h4>
             <ul className="space-y-2 text-gray-300">
-              <li><a href="#" className="hover:text-white transition-colors">Arts</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Movies</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">TV/Radio</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Sports</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Magazine</a></li>
+              <li>
+                <Link to="/" className="hover:text-white transition-colors">Home</Link>
+              </li>
+              <li>
+                <Link to="/register" className="hover:text-white transition-colors">Subscribe</Link>
+              </li>
             </ul>
           </div>
-          
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">TIME ZONE</h4>
-            <ul className="space-y-2 text-gray-300">
-              <li><a href="#" className="hover:text-white transition-colors">Video</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Podcast</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Multimedia</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Subscribe</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Digital Magazine</a></li>
-            </ul>
-          </div>
+        </div>
+        
+        {/* Copyright */}
+        <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400 text-sm">
+          <p>&copy; {currentYear} LET'S READ. All rights reserved.</p>
         </div>
       </div>
     </footer>

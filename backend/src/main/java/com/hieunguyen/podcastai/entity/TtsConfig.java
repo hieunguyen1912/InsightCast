@@ -18,7 +18,7 @@ import lombok.*;
 public class TtsConfig extends BaseEntity {
 
     @Column(name = "name", nullable = false, length = 100)
-    private String name; // "My Default Voice", "News Reader", etc.
+    private String name;
 
     @Column(name = "description", length = 500)
     private String description;
@@ -30,16 +30,16 @@ public class TtsConfig extends BaseEntity {
     private String voiceName; // "en-US-Standard-A"
 
     @Column(name = "speaking_rate", nullable = false)
-    private Double speakingRate; // 0.25 to 4.0
+    private Double speakingRate;
 
     @Column(name = "pitch", nullable = false)
-    private Double pitch; // -20.0 to 20.0
+    private Double pitch;
 
     @Column(name = "volume_gain_db", nullable = false)
-    private Double volumeGainDb; // -96.0 to 16.0
+    private Double volumeGain;
 
     @Column(name = "audio_encoding", nullable = false, length = 20)
-    private String audioEncoding; // "MP3", "WAV", "LINEAR16"
+    private String audioEncoding;
 
     @Column(name = "sample_rate_hertz")
     private Integer sampleRateHertz; // 8000, 16000, 22050, 44100

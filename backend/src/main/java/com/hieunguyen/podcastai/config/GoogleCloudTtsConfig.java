@@ -2,8 +2,12 @@ package com.hieunguyen.podcastai.config;
 
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.cloud.texttospeech.v1.TextToSpeechClient;
 import com.google.cloud.texttospeech.v1.TextToSpeechSettings;
+import com.google.cloud.texttospeech.v1.TextToSpeechLongAudioSynthesizeClient;
+import com.google.cloud.texttospeech.v1.TextToSpeechLongAudioSynthesizeSettings;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +29,15 @@ public class GoogleCloudTtsConfig {
 
     @Value("${google.cloud.tts.credentials.path:}")
     private String credentialsPath;
+
+    @Value("${google.cloud.tts.long-audio.gcs-bucket-name:}")
+    private String gcsBucketName;
+
+    @Value("${google.cloud.tts.long-audio.location:global}")
+    private String location;
+
+    @Value("${google.cloud.tts.long-audio.operation-timeout-seconds:300}")
+    private int operationTimeoutSeconds;
 
     @PostConstruct
     public void init() throws Exception {
@@ -73,7 +86,6 @@ public class GoogleCloudTtsConfig {
         log.info("Current GOOGLE_APPLICATION_CREDENTIALS: {}", System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
 
         try {
-            // Tạo credentials object trực tiếp từ file
             GoogleCredentials credentials = GoogleCredentials.fromStream(
                     new FileInputStream(credentialsPath)
             );
@@ -88,6 +100,54 @@ public class GoogleCloudTtsConfig {
 
         } catch (Exception e) {
             log.error("✗ Failed to create client: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Bean
+    public TextToSpeechLongAudioSynthesizeClient textToSpeechLongAudioSynthesizeClient() throws Exception {
+        log.info("Creating TextToSpeechLongAudioSynthesizeClient...");
+        log.info("Current GOOGLE_APPLICATION_CREDENTIALS: {}", System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
+
+        try {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(
+                    new FileInputStream(credentialsPath)
+            );
+
+            TextToSpeechLongAudioSynthesizeSettings settings = TextToSpeechLongAudioSynthesizeSettings.newBuilder()
+                    .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+                    .build();
+
+            TextToSpeechLongAudioSynthesizeClient client = TextToSpeechLongAudioSynthesizeClient.create(settings);
+            log.info("✓ TextToSpeechLongAudioSynthesizeClient created successfully");
+            return client;
+
+        } catch (Exception e) {
+            log.error("✗ Failed to create long audio client: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Bean
+    public Storage storage() throws Exception {
+        log.info("Creating Google Cloud Storage client...");
+        
+        try {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(
+                    new FileInputStream(credentialsPath)
+            );
+
+            Storage storage = StorageOptions.newBuilder()
+                    .setCredentials(credentials)
+                    .setProjectId(projectId)
+                    .build()
+                    .getService();
+            
+            log.info("✓ Google Cloud Storage client created successfully");
+            return storage;
+
+        } catch (Exception e) {
+            log.error("✗ Failed to create Storage client: {}", e.getMessage(), e);
             throw e;
         }
     }

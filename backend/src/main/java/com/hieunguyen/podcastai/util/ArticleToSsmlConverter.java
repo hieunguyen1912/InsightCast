@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * Utility class to convert HTML article content to SSML format
@@ -179,8 +181,25 @@ public class ArticleToSsmlConverter {
         // Remove outer <speak> tags temporarily
         String content = ssml.replaceFirst("^<speak>", "").replaceFirst("</speak>$", "");
         
-        // Split by paragraphs or sentences
-        String[] sentences = content.split("(?<=<break time=\"[0-9.]+s\"/>)");
+        // Split by break tags using Pattern/Matcher to avoid lookbehind quantifier issue
+        Pattern breakPattern = Pattern.compile("<break time=\"[0-9.]+s\"/>");
+        Matcher matcher = breakPattern.matcher(content);
+        
+        List<Integer> splitPoints = new ArrayList<>();
+        splitPoints.add(0); // Start at beginning
+        
+        while (matcher.find()) {
+            // Add position after the break tag
+            splitPoints.add(matcher.end());
+        }
+        
+        // Build segments from split points
+        List<String> sentences = new ArrayList<>();
+        for (int i = 0; i < splitPoints.size(); i++) {
+            int start = splitPoints.get(i);
+            int end = (i < splitPoints.size() - 1) ? splitPoints.get(i + 1) : content.length();
+            sentences.add(content.substring(start, end));
+        }
         
         StringBuilder currentChunk = new StringBuilder("<speak>");
         
@@ -205,4 +224,3 @@ public class ArticleToSsmlConverter {
         return chunks;
     }
 }
-
