@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { profileService } from '../api';
+import { formatDateForAPI } from '../../../utils/formatTime';
 import { User, Mail, Phone, Calendar, CheckCircle, XCircle, Shield, Clock, Edit2, Save, X } from 'lucide-react';
 
 function ProfileModule() {
@@ -39,13 +40,18 @@ function ProfileModule() {
         
         if (result.success) {
           setProfile(result.data);
+          // Format dateOfBirth to YYYY-MM-DD for input type="date"
+          const dateOfBirthFormatted = result.data.dateOfBirth 
+            ? formatDateForAPI(result.data.dateOfBirth) || ''
+            : '';
+          
           setEditForm({
             username: result.data.username || '',
             email: result.data.email || '',
             firstName: result.data.firstName || '',
             lastName: result.data.lastName || '',
             phoneNumber: result.data.phoneNumber || '',
-            dateOfBirth: result.data.dateOfBirth || ''
+            dateOfBirth: dateOfBirthFormatted
           });
         } else {
           setError(result.error || 'Failed to load profile');
@@ -74,7 +80,14 @@ function ProfileModule() {
       setIsLoading(true);
       setError(null);
 
-      const result = await updateProfile(editForm);
+      // Format dateOfBirth to YYYY-MM-DD for API (LocalDate)
+      const updateData = {
+        ...editForm,
+        dateOfBirth: editForm.dateOfBirth ? formatDateForAPI(editForm.dateOfBirth) : null,
+        ...(profile?.version !== undefined && { version: profile.version })
+      };
+
+      const result = await updateProfile(updateData);
       
       if (result.success) {
         const profileResult = await profileService.getProfile();
@@ -94,13 +107,18 @@ function ProfileModule() {
   };
 
   const handleCancel = () => {
+    // Format dateOfBirth to YYYY-MM-DD for input type="date"
+    const dateOfBirthFormatted = profile?.dateOfBirth 
+      ? formatDateForAPI(profile.dateOfBirth) || ''
+      : '';
+    
     setEditForm({
       username: profile?.username || '',
       email: profile?.email || '',
       firstName: profile?.firstName || '',
       lastName: profile?.lastName || '',
       phoneNumber: profile?.phoneNumber || '',
-      dateOfBirth: profile?.dateOfBirth || ''
+      dateOfBirth: dateOfBirthFormatted
     });
     setIsEditing(false);
     setError(null);

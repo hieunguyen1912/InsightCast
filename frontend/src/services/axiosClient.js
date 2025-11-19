@@ -54,6 +54,33 @@ apiClient.interceptors.request.use(
   }
 );
 
+// List of public endpoints that don't require authentication
+const PUBLIC_ENDPOINTS = [
+  '/news/search',
+  '/news/featured',
+  '/news/trending',
+  '/news/latest',
+  '/news/categories',
+  '/news/category'
+];
+
+// Check if an endpoint is public (allows access without auth)
+const isPublicEndpoint = (url) => {
+  if (!url) return false;
+  // Extract path without query parameters
+  const path = url.split('?')[0];
+  // Remove base URL prefix if present (e.g., /api/v1)
+  // Note: axios config.url is relative to baseURL, so it should already be without /api/v1
+  const cleanPath = path.replace(/^\/api\/v1/, '') || path;
+  
+  // Check if URL matches any public endpoint pattern
+  // Check exact matches or starts with for endpoints like /news/{id}
+  return PUBLIC_ENDPOINTS.some(endpoint => cleanPath === endpoint || cleanPath.startsWith(endpoint + '/')) ||
+         /^\/news\/\d+$/.test(cleanPath) || // /news/{id}
+         /^\/news\/\d+\/related/.test(cleanPath) || // /news/{id}/related
+         /^\/news\/category\/\d+/.test(cleanPath); // /news/category/{id}
+};
+
 apiClient.interceptors.response.use(
   (response) => {
     const backendStatus = response.data?.status;
@@ -80,6 +107,7 @@ apiClient.interceptors.response.use(
     
     if (isUnauthorized && originalRequest) {
       const isRefreshEndpoint = originalRequest.url?.includes('/auth/refresh');
+      const isPublic = isPublicEndpoint(originalRequest.url);
       
       if (isRefreshEndpoint) {
         isRefreshing = false;
@@ -93,6 +121,22 @@ apiClient.interceptors.response.use(
         }
         
         return Promise.reject(error);
+      }
+
+      // For public endpoints, if we get 401, try retrying without auth headers
+      if (isPublic && !originalRequest._retryWithoutAuth) {
+        originalRequest._retryWithoutAuth = true;
+        // Remove Authorization header and retry
+        const retryConfig = {
+          ...originalRequest,
+          headers: {
+            ...originalRequest.headers,
+            Authorization: undefined
+          },
+          _retry: true
+        };
+        delete retryConfig.headers.Authorization;
+        return apiClient(retryConfig);
       }
 
       if (originalRequest._retry) {
@@ -115,6 +159,20 @@ apiClient.interceptors.response.use(
             return apiClient(retryConfig);
           })
           .catch(err => {
+            // For public endpoints, if refresh fails, try without auth
+            if (isPublic && !originalRequest._retryWithoutAuth) {
+              originalRequest._retryWithoutAuth = true;
+              const retryConfig = {
+                ...originalRequest,
+                headers: {
+                  ...originalRequest.headers,
+                  Authorization: undefined
+                },
+                _retry: true
+              };
+              delete retryConfig.headers.Authorization;
+              return apiClient(retryConfig);
+            }
             return Promise.reject(err);
           });
       }
@@ -143,11 +201,45 @@ apiClient.interceptors.response.use(
           // Retry the original request with new token
           return apiClient(retryConfig);
         } else {
-          // Refresh failed, clear auth and redirect to login
+          // Refresh failed
+          // For public endpoints, try without auth instead of redirecting
+          if (isPublic && !originalRequest._retryWithoutAuth) {
+            processQueue(null, null);
+            isRefreshing = false;
+            originalRequest._retryWithoutAuth = true;
+            const retryConfig = {
+              ...originalRequest,
+              headers: {
+                ...originalRequest.headers,
+                Authorization: undefined
+              },
+              _retry: true
+            };
+            delete retryConfig.headers.Authorization;
+            return apiClient(retryConfig);
+          }
+          // For protected endpoints, clear auth and redirect to login
           throw new Error('Token refresh failed');
         }
       } catch (refreshError) {
-        // Refresh failed, clear auth and redirect to login
+        // For public endpoints, try without auth instead of redirecting
+        if (isPublic && !originalRequest._retryWithoutAuth) {
+          processQueue(null, null);
+          isRefreshing = false;
+          originalRequest._retryWithoutAuth = true;
+          const retryConfig = {
+            ...originalRequest,
+            headers: {
+              ...originalRequest.headers,
+              Authorization: undefined
+            },
+            _retry: true
+          };
+          delete retryConfig.headers.Authorization;
+          return apiClient(retryConfig);
+        }
+        
+        // For protected endpoints, clear auth and redirect to login
         processQueue(refreshError, null);
         isRefreshing = false;
         

@@ -24,6 +24,9 @@ public class NewsArticle extends AuditableEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
+
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
@@ -60,11 +63,14 @@ public class NewsArticle extends AuditableEntity {
     @Builder.Default
     private Long likeCount = 0L;
 
-    @Column(name = "share_count", nullable = false)
-    @Builder.Default
-    private Long shareCount = 0L;
-
     @OneToMany(mappedBy = "newsArticle", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<AudioFile> audioFiles = new ArrayList<>();
+
+    @OneToMany(mappedBy = "article", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<ArticleImage> articleImages = new ArrayList<>();
+
+    @Column(name = "search_vector", columnDefinition = "tsvector", insertable = false, updatable = false)
+    private String searchVector;
 }

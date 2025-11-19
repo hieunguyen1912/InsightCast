@@ -15,18 +15,20 @@ import java.time.Instant;
 public class AudioFileDto {
     private Long id;
 
+    private String operationName;
+    private String gcsUri;
+
     private String fileName;
-    private String filePath;
-    private Long fileSizeBytes;
 
     private ProcessingStatus status;
     private Instant publishedAt;
     private Instant createdAt;
     private Instant updatedAt;
-    
+
     private String errorMessage;
     private String errorCode;
     private Integer retryCount;
-    
+
     private TtsConfigDto ttsConfig;
+    private Long articleId;
 }

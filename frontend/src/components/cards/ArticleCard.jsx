@@ -52,7 +52,6 @@ function ArticleCard({
     // Use a small delay to ensure img element exists
     const checkImageLoaded = setTimeout(() => {
       if (imgRef.current) {
-        // Image is already loaded from cache
         if (imgRef.current.complete && imgRef.current.naturalHeight !== 0) {
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -99,20 +98,6 @@ function ArticleCard({
   // Priority: featuredImage > imageUrl (for backward compatibility)
   const getImageUrl = () => {
     const imageUrl = article.featuredImage || article.imageUrl;
-    
-    // Check if image URL is valid
-    if (imageError || !imageUrl || (typeof imageUrl === 'string' && imageUrl.trim() === '')) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('ArticleCard - Using fallback image:', {
-          id: article.id,
-          title: article.title,
-          reason: imageError ? 'imageError' : !imageUrl ? 'no URL' : 'empty URL'
-        });
-      }
-      return getFallbackImage();
-    }
-    
-    // Process the URL to handle relative URLs
     const processedUrl = processImageUrl(imageUrl);
     
     return processedUrl || getFallbackImage();
@@ -192,8 +177,32 @@ function ArticleCard({
       return null;
     }
 
-    // Support both authorName (from backend) and author (for backward compatibility)
-    const authorName = article.authorName || article.author || 'Anonymous';
+    // Helper function to extract author name from various formats
+    // Supports both authorName (string) and author (object or string)
+    const getAuthorName = () => {
+      // Handle authorName (string) from NewsArticleSummaryResponse
+      if (article.authorName) {
+        return article.authorName;
+      }
+      // Handle author as string
+      if (typeof article.author === 'string') {
+        return article.author;
+      }
+      // Handle author as object from NewsArticleResponse
+      if (article.author && typeof article.author === 'object') {
+        if (article.author.firstName && article.author.lastName) {
+          return `${article.author.firstName} ${article.author.lastName}`;
+        }
+        return article.author.username || 
+               article.author.firstName || 
+               article.author.lastName || 
+               article.author.email ||
+               'Anonymous';
+      }
+      return 'Anonymous';
+    };
+
+    const authorName = getAuthorName();
 
     return (
       <div className="flex items-center text-sm text-gray-500 mb-2">

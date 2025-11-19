@@ -2,8 +2,14 @@ package com.hieunguyen.podcastai.controller;
 
 import java.util.List;
 
+import com.hieunguyen.podcastai.dto.response.*;
+import com.hieunguyen.podcastai.service.ArticleToAudioService;
+import com.hieunguyen.podcastai.util.PaginationHelper;
+import org.apache.coyote.Response;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,8 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.hieunguyen.podcastai.dto.request.user.AvatarUploadRequest;
 import com.hieunguyen.podcastai.dto.request.user.PasswordChangeRequest;
 import com.hieunguyen.podcastai.dto.request.user.UserUpdateRequest;
-import com.hieunguyen.podcastai.dto.response.ApiResponse;
-import com.hieunguyen.podcastai.dto.response.UserDto;
 import com.hieunguyen.podcastai.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +42,8 @@ import lombok.extern.slf4j.Slf4j;
 public class UserController {
 
     private final UserService userService;
+    private final ArticleToAudioService articleToAudioService;
+
 
     @Operation(summary = "Get current user profile")
     @GetMapping("/me")
@@ -94,10 +100,21 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Account deleted successfully", null));
     }
 
-    @GetMapping( "/advance-search-with-specification")
-    public ResponseEntity<ApiResponse<List<UserDto>>> search(Pageable pageable, @RequestParam(value = "search", required = false) String... search) {
-        Page<UserDto> users = userService.searchUserBySpecification(pageable, search);
+    @GetMapping("/audio")
+    public ResponseEntity<ApiResponse<PaginatedResponse<AudioFileDto>>> getAudioByUser(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "sortOrder") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection
+    ) {
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
 
-        return ResponseEntity.ok(ApiResponse.success("Users fetched successfully", users.getContent()));
+        Page<AudioFileDto> audioFileDtos = articleToAudioService.getAudioFilesByUser(pageable);
+
+        PaginatedResponse<AudioFileDto> paginatedResponse = PaginationHelper.toPaginatedResponse(audioFileDtos);
+
+        return ResponseEntity.ok(ApiResponse.success("Audio fetched successfully", paginatedResponse));
     }
+
 }

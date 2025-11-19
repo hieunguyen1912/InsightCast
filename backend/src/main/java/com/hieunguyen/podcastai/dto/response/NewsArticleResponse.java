@@ -5,6 +5,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.util.List;
+
 @Data
 @SuperBuilder
 @NoArgsConstructor
@@ -12,8 +14,10 @@ import lombok.experimental.SuperBuilder;
 public class NewsArticleResponse extends BaseNewsArticleResponse {
 
     private String content;
+    private String summary;
     private UserDto author;
     private CategoryResponse category;
+    private List<String> contentImageUrls;
 
     @Data
     @SuperBuilder

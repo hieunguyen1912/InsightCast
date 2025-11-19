@@ -6,14 +6,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { isValidEmail, validatePassword } from '../../../utils/validation';
+import { isValidEmail, validatePassword, validateUsername } from '../../../utils/validation';
 import '../../../assets/styles/AuthPage.css'; // Only for floating shapes animation
 
 function RegisterPage() {
   const { register, error, isLoading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -48,16 +48,17 @@ function RegisterPage() {
   const validateForm = () => {
     const errors = {};
     
-    if (!formData.name.trim()) {
-      errors.name = 'Name is required';
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'Name must be at least 2 characters';
+    const usernameValidation = validateUsername(formData.username);
+    if (!usernameValidation.isValid) {
+      errors.username = usernameValidation.message;
     }
     
     if (!formData.email) {
       errors.email = 'Email is required';
     } else if (!isValidEmail(formData.email)) {
       errors.email = 'Please enter a valid email address';
+    } else if (formData.email.length > 100) {
+      errors.email = 'Email must not exceed 100 characters';
     }
     
     const passwordValidation = validatePassword(formData.password);
@@ -68,7 +69,7 @@ function RegisterPage() {
     if (!formData.confirmPassword) {
       errors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+      errors.confirmPassword = 'Passwords must match';
     }
     
     setValidationErrors(errors);
@@ -83,9 +84,10 @@ function RegisterPage() {
     }
     
     const result = await register({
-      name: formData.name.trim(),
-      email: formData.email,
-      password: formData.password
+      username: formData.username.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      confirmPassword: formData.confirmPassword
     });
     
     if (result.success) {
@@ -132,31 +134,35 @@ function RegisterPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="name" className="text-sm font-medium text-black">
-                Full Name
+              <label htmlFor="username" className="text-sm font-medium text-black">
+                Username
               </label>
-              <div className={`relative flex items-center px-4 py-3 border rounded-md bg-white transition-all ${validationErrors.name ? 'border-red-500' : 'border-gray-200 focus-within:border-black'}`}>
+              <div className={`relative flex items-center px-4 py-3 border rounded-md bg-white transition-all ${validationErrors.username ? 'border-red-500' : 'border-gray-200 focus-within:border-black'}`}>
                 <svg className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                   <circle cx="12" cy="7" r="4"/>
                 </svg>
                 <input
                   type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
+                  id="username"
+                  name="username"
+                  value={formData.username}
                   onChange={handleInputChange}
                   className="flex-1 border-0 outline-none bg-transparent text-base text-black placeholder-gray-400"
-                  placeholder="Enter your full name"
+                  placeholder="Enter username (3-50 characters)"
                   required
-                  aria-describedby={validationErrors.name ? 'name-error' : undefined}
+                  maxLength={50}
+                  aria-describedby={validationErrors.username ? 'username-error' : undefined}
                 />
               </div>
-              {validationErrors.name && (
-                <span id="name-error" className="text-sm text-red-600">
-                  {validationErrors.name}
+              {validationErrors.username && (
+                <span id="username-error" className="text-sm text-red-600">
+                  {validationErrors.username}
                 </span>
               )}
+              <p className="text-xs text-gray-500">
+                Letters, numbers, and underscores only (3-50 characters)
+              </p>
             </div>
 
             <div className="flex flex-col gap-2">

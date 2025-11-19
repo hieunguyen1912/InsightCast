@@ -8,21 +8,17 @@ import com.google.cloud.texttospeech.v1.SynthesisInput;
 import com.google.cloud.texttospeech.v1.SynthesizeLongAudioMetadata;
 import com.google.cloud.texttospeech.v1.SynthesizeLongAudioRequest;
 import com.google.cloud.texttospeech.v1.SynthesizeLongAudioResponse;
-import com.google.cloud.texttospeech.v1.SynthesizeSpeechRequest;
-import com.google.cloud.texttospeech.v1.SynthesizeSpeechResponse;
 import com.google.cloud.texttospeech.v1.TextToSpeechClient;
 import com.google.cloud.texttospeech.v1.TextToSpeechLongAudioSynthesizeClient;
 import com.google.cloud.texttospeech.v1.Voice;
 import com.google.cloud.texttospeech.v1.VoiceSelectionParams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Timestamp;
-import com.hieunguyen.podcastai.dto.request.GoogleTtsRequest;
 import com.hieunguyen.podcastai.dto.request.LongAudioSynthesisRequest;
 import com.hieunguyen.podcastai.dto.request.VoiceSettingsRequest;
-import com.hieunguyen.podcastai.dto.response.GoogleTtsResponse;
 import com.hieunguyen.podcastai.dto.response.LongAudioSynthesisResponse;
-import com.hieunguyen.podcastai.enums.AudioEncoding;
 import com.hieunguyen.podcastai.service.GoogleTtsService;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +28,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.UUID;
+
 
 @Service
 @Slf4j
@@ -53,121 +49,6 @@ public class GoogleTtsServiceImpl implements GoogleTtsService {
 
     @Value("${google.cloud.tts.long-audio.operation-timeout-seconds:300}")
     private int operationTimeoutSeconds;
-
-    @Override
-    public GoogleTtsResponse synthesizeText(GoogleTtsRequest request) {
-        log.info("Synthesizing text with Google Cloud TTS: {} characters", request.getText().length());
-        
-        try {
-            SynthesizeSpeechResponse response = performSynthesis(request);
-            
-            String fileName = generateFileName(request.getVoiceSettings().getAudioEncoding());
-            
-            log.info("Successfully synthesized text to speech. Audio size: {} bytes", 
-                    response.getAudioContent().size());
-
-            return GoogleTtsResponse.builder()
-                    .audioContent(response.getAudioContent().toStringUtf8())
-                    .audioEncoding(request.getVoiceSettings().getAudioEncoding().getValue())
-                    .sampleRateHertz(request.getVoiceSettings().getSampleRateHertz().getHertz())
-                    .languageCode(request.getVoiceSettings().getLanguageCode())
-                    .voiceName(request.getVoiceSettings().getVoiceName())
-                    .speakingRate(request.getVoiceSettings().getSpeakingRate())
-                    .pitch(request.getVoiceSettings().getPitch())
-                    .volumeGain(request.getVoiceSettings().getVolumeGain())
-                    .generatedAt(LocalDateTime.now())
-                    .durationMs(calculateDuration(request.getText(), request.getVoiceSettings().getSpeakingRate()))
-                    .fileName(fileName)
-                    .fileUrl("/api/v1/tts/audio/" + fileName)
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Failed to synthesize text with Google Cloud TTS: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to synthesize text to speech", e);
-        }
-    }
-
-    @Override
-    public byte[] synthesizeAudioBytes(GoogleTtsRequest request) {
-        log.info("Synthesizing text with Google Cloud TTS: {} characters", request.getText().length());
-        
-        try {
-            SynthesizeSpeechResponse response = performSynthesis(request);
-            
-            byte[] audioBytes = response.getAudioContent().toByteArray();
-            log.info("Successfully synthesized audio bytes, size: {} bytes", audioBytes.length);
-
-            return audioBytes;
-
-        } catch (Exception e) {
-            log.error("Failed to synthesize text with Google Cloud TTS: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to synthesize text to speech", e);
-        }
-    }
-
-    private SynthesizeSpeechResponse performSynthesis(GoogleTtsRequest request) {
-        try {
-            SynthesisInput input;
-            
-            // Detect if input is SSML (starts with <speak>) or plain text
-            String text = request.getText();
-            if (text != null && text.trim().startsWith("<speak>")) {
-                // SSML input
-                input = SynthesisInput.newBuilder()
-                        .setSsml(text)
-                        .build();
-                log.debug("Using SSML input for synthesis");
-            } else {
-                // Plain text input
-                input = SynthesisInput.newBuilder()
-                        .setText(text)
-                        .build();
-                log.debug("Using plain text input for synthesis");
-            }
-
-            VoiceSelectionParams voice = VoiceSelectionParams.newBuilder()
-                    .setLanguageCode(request.getVoiceSettings().getLanguageCode())
-                    .setName(request.getVoiceSettings().getVoiceName())
-                    .build();
-
-            AudioConfig audioConfig = AudioConfig.newBuilder()
-                    .setAudioEncoding(request.getVoiceSettings().getAudioEncoding().toGoogleAudioEncoding())
-                    .setSpeakingRate(request.getVoiceSettings().getSpeakingRate())
-                    .setPitch(request.getVoiceSettings().getPitch())
-                    .setVolumeGainDb(request.getVoiceSettings().getVolumeGain())
-                    .setSampleRateHertz(request.getVoiceSettings().getSampleRateHertz().getHertz())
-                    .build();
-
-            SynthesizeSpeechRequest synthesisRequest = SynthesizeSpeechRequest.newBuilder()
-                    .setInput(input)
-                    .setVoice(voice)
-                    .setAudioConfig(audioConfig)
-                    .build();
-
-            SynthesizeSpeechResponse response = textToSpeechClient.synthesizeSpeech(synthesisRequest);
-                        
-            log.info("Successfully synthesized text to speech. Audio size: {} bytes", 
-                    response.getAudioContent().size());
-
-            return response;
-
-        } catch (Exception e) {
-            log.error("Failed to synthesize text with Google Cloud TTS: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to synthesize text to speech", e);
-        }
-    }
-
-    @Override
-    public GoogleTtsResponse synthesizeTextWithSettings(String text, VoiceSettingsRequest voiceSettings) {
-        log.info("Synthesizing text with custom voice settings: {} characters", text.length());
-        
-        GoogleTtsRequest request = GoogleTtsRequest.builder()
-                .text(text)
-                .voiceSettings(voiceSettings)
-                .build();
-
-        return synthesizeText(request);
-    }
 
     @Override
     public List<Voice> getAvailableVoices(String languageCode) {
@@ -211,19 +92,6 @@ public class GoogleTtsServiceImpl implements GoogleTtsService {
             log.error("Failed to validate voice settings: {}", e.getMessage(), e);
             return false;
         }
-    }
-
-    private String generateFileName(AudioEncoding audioEncoding) {
-        String extension = audioEncoding.getFileExtension();
-        return String.format("tts_%s.%s", UUID.randomUUID().toString(), extension);
-    }
-
-    private Long calculateDuration(String text, Double speakingRate) {
-        String plainText = text.replaceAll("<[^>]+>", "").trim();
-        int wordCount = plainText.split("\\s+").length;
-        double wordsPerMinute = 150.0 * speakingRate;
-        double durationMinutes = wordCount / wordsPerMinute;
-        return Math.round(durationMinutes * 60 * 1000);
     }
 
     @Override
@@ -386,5 +254,10 @@ public class GoogleTtsServiceImpl implements GoogleTtsService {
         }
         Instant instant = Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
         return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+    }
+
+    @PreDestroy
+    public void close() {
+        longAudioSynthesizeClient.close();
     }
 }

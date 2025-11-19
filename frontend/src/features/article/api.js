@@ -8,10 +8,7 @@ import { API_ENDPOINTS } from '../../constants/apiEndpoints';
 import { authService } from '../../features/auth/api';
 
 class NewsService {
-  /**
-   * Get featured article for hero section
-   * @returns {Promise<Object>} Featured article data
-   */
+
   async getFeaturedArticle() {
     try {
       const response = await apiClient.get(API_ENDPOINTS.NEWS.FEATURED);
@@ -24,11 +21,6 @@ class NewsService {
     }
   }
 
-  /**
-   * Get trending articles for side panel
-   * @param {number} limit - Number of articles to fetch
-   * @returns {Promise<Array>} Array of trending articles
-   */
   async getTrendingArticles(limit = 4) {
     try {
       const response = await apiClient.get(`${API_ENDPOINTS.NEWS.TRENDING}?limit=${limit}`);
@@ -41,11 +33,7 @@ class NewsService {
     }
   }
 
-  /**
-   * Get latest articles
-   * @param {number} limit - Number of articles to fetch
-   * @returns {Promise<Array>} Array of latest articles
-   */
+
   async getLatestArticles(limit = 4) {
     try {
       const response = await apiClient.get(`${API_ENDPOINTS.NEWS.LATEST}?limit=${limit}`);
@@ -58,11 +46,7 @@ class NewsService {
     }
   }
 
-  /**
-   * Get article by ID
-   * @param {number} id - Article ID
-   * @returns {Promise<Object>} Article data
-   */
+
   async getArticleById(id) {
     try {
       const response = await apiClient.get(API_ENDPOINTS.NEWS.BY_ID(id));
@@ -92,12 +76,6 @@ class NewsService {
     }
   }
 
-  /**
-   * Get related articles
-   * @param {number} id - Article ID
-   * @param {number} limit - Number of related articles to fetch
-   * @returns {Promise<Array>} Array of related articles
-   */
   async getRelatedArticles(id, limit = 4) {
     try {
       const response = await apiClient.get(`${API_ENDPOINTS.NEWS.RELATED(id)}?limit=${limit}`);
@@ -111,33 +89,27 @@ class NewsService {
   }
 
   /**
-   * Like/Unlike article
-   * @param {number} articleId - Article ID
-   * @param {boolean} isLiked - Whether to like or unlike
-   * @returns {Promise<Object>} Updated like count and status
+   * Get articles by category ID
+   * @param {number} categoryId - Category ID
+   * @param {number} limit - Number of articles to fetch (default: 4)
+   * @returns {Promise<Array>} Array of articles
    */
-  async toggleArticleLike(articleId, isLiked) {
+  async getArticlesByCategory(categoryId, limit = 4) {
     try {
-      const method = isLiked ? 'post' : 'delete';
-      const response = await apiClient[method](`/news/${articleId}/like`);
-      return response.data;
+      const response = await apiClient.get(`${API_ENDPOINTS.NEWS.BY_CATEGORY(categoryId)}?page=0&size=${limit}&sortBy=publishedAt&sortDirection=desc`);
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      // Handle paginated response
+      if (data && data.content) {
+        return Array.isArray(data.content) ? data.content : [];
+      }
+      return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error(`Error toggling like for article ${articleId}:`, error);
-      throw error;
+      console.error(`Error fetching articles for category ${categoryId}:`, error);
+      return [];
     }
   }
-
-  /**
-   * Search articles with filters
-   * @param {Object} filters - Search filters
-   * @param {string} filters.keyword - Keyword to search
-   * @param {number} filters.categoryId - Category ID filter
-   * @param {string} filters.fromDate - Start date (ISO string or Instant format)
-   * @param {string} filters.toDate - End date (ISO string or Instant format)
-   * @param {number} page - Page number (0-indexed)
-   * @param {number} size - Items per page
-   * @returns {Promise<Object>} PaginatedResponse with content array and pagination metadata
-   */
+  
   async searchArticles(filters, page = 0, size = 10) {
     try {
       const params = new URLSearchParams();
@@ -176,37 +148,18 @@ class NewsService {
     }
   }
 
-  /**
-   * Get all categories
-   * @returns {Promise<Array>} Array of categories
-   */
-  async getCategories() {
+  async getArticleAudioFiles(articleId) {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NEWS.CATEGORIES);
+      const response = await apiClient.get(API_ENDPOINTS.ARTICLES.GET_AUDIO_FILES(articleId));
+      // Handle both response.data and response.data.data structure
       const data = response.data?.data || response.data;
       return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error(`Error fetching audio files for article ${articleId}:`, error);
       return [];
     }
   }
 
-  /**
-   * Generate audio from article
-   * @param {number} articleId - Article ID
-   * @param {Object} options - Audio generation options
-   * @param {Object} options.customVoiceSettings - Custom voice configuration (optional)
-   * @param {string} options.customVoiceSettings.languageCode - Language code (e.g., 'en-US')
-   * @param {string} options.customVoiceSettings.voiceName - Google TTS voice name
-   * @param {number} options.customVoiceSettings.speakingRate - Speaking rate (0.25 - 4.0)
-   * @param {number} options.customVoiceSettings.pitch - Pitch adjustment (-20.0 to 20.0)
-   * @param {number} options.customVoiceSettings.volumeGain - Volume gain in dB (-96.0 to 16.0)
-   * @param {string} options.customVoiceSettings.audioEncoding - Audio encoding format (default: 'MP3')
-   * @param {number} options.customVoiceSettings.sampleRateHertz - Sample rate
-   * @param {boolean} options.enableSummarization - Enable article summarization (default: true)
-   * @param {boolean} options.enableTranslation - Enable article translation (default: false)
-   * @returns {Promise<Object>} Audio generation response with audio file data
-   */
   async generateAudio(articleId, options = {}) {
     try {
       const requestBody = {};
@@ -244,6 +197,53 @@ class NewsService {
       
       // Extract error message from response
       const errorMessage = error.response?.data?.message || error.message || 'Failed to generate audio';
+      const errorCode = error.response?.data?.code || error.response?.status;
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
+        status: error.response?.status
+      };
+    }
+  }
+
+  /**
+   * Generate audio from article summary
+   * Available to all users (not just authors)
+   * @param {number} articleId - Article ID
+   * @param {Object} options - Generation options
+   * @param {Object} options.customVoiceSettings - Custom voice settings (optional)
+   * @returns {Promise<Object>} Audio generation result
+   */
+  async generateAudioFromSummary(articleId, options = {}) {
+    try {
+      const requestBody = {};
+      
+      // Add custom voice settings if provided
+      if (options.customVoiceSettings) {
+        requestBody.customVoiceSettings = options.customVoiceSettings;
+      }
+
+      // Use /articles endpoint for audio generation from summary (available to all users)
+      const response = await apiClient.post(
+        API_ENDPOINTS.ARTICLES.GENERATE_AUDIO_FROM_SUMMARY(articleId),
+        Object.keys(requestBody).length > 0 ? requestBody : {}
+      );
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      return {
+        success: true,
+        data: data,
+        message: response.data?.message || 'Audio generation from summary started successfully'
+      };
+    } catch (error) {
+      console.error(`Error generating audio from summary for article ${articleId}:`, error);
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to generate audio from summary';
       const errorCode = error.response?.data?.code || error.response?.status;
       
       return {
@@ -319,6 +319,71 @@ class NewsService {
   }
 
   /**
+   * Get user's audio files with pagination
+   * @param {number} page - Page number (0-indexed)
+   * @param {number} size - Items per page
+   * @param {string} sortBy - Sort field (default: 'createdAt')
+   * @param {string} sortDirection - Sort direction 'asc' or 'desc' (default: 'desc')
+   * @returns {Promise<Object>} PaginatedResponse with content array and pagination metadata
+   */
+  async getUserAudioFiles(page = 0, size = 10, sortBy = 'createdAt', sortDirection = 'desc') {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('size', size);
+      params.append('sortBy', sortBy);
+      params.append('sortDirection', sortDirection);
+
+      const response = await apiClient.get(`${API_ENDPOINTS.USER.AUDIO}?${params.toString()}`);
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      return data || { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 };
+    } catch (error) {
+      console.error('Error fetching user audio files:', error);
+      return { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 };
+    }
+  }
+
+  /**
+   * Delete audio file
+   * @param {number} audioFileId - Audio file ID
+   * @returns {Promise<Object>} Delete result
+   */
+  async deleteAudio(audioFileId) {
+    if (!audioFileId) {
+      throw new Error('Audio file ID is required');
+    }
+
+    try {
+      const response = await apiClient.delete(
+        API_ENDPOINTS.ARTICLES.DELETE_AUDIO(audioFileId)
+      );
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      return {
+        success: true,
+        data: data,
+        message: response.data?.message || 'Audio file deleted successfully'
+      };
+    } catch (error) {
+      console.error(`Error deleting audio file ${audioFileId}:`, error);
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete audio file';
+      const errorCode = error.response?.data?.code || error.response?.status;
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
+        status: error.response?.status
+      };
+    }
+  }
+
+  /**
    * Download audio file
    * Downloads the complete audio file as a byte array
    * @param {number} audioFileId - Audio file ID
@@ -350,6 +415,133 @@ class NewsService {
       throw {
         message: errorMessage,
         code: errorCode,
+        status: error.response?.status
+      };
+    }
+  }
+
+  /**
+   * Add article to favorites
+   * @param {number} articleId - Article ID
+   * @returns {Promise<Object>} Favorite data with article information
+   */
+  async addArticleToFavorites(articleId) {
+    if (!articleId) {
+      throw new Error('Article ID is required');
+    }
+
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.USER.ADD_ARTICLE_FAVORITE(articleId)
+      );
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      return {
+        success: true,
+        data: data,
+        message: response.data?.message || 'Article added to favorites successfully'
+      };
+    } catch (error) {
+      console.error(`Error adding article ${articleId} to favorites:`, error);
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to add article to favorites';
+      const errorCode = error.response?.data?.code || error.response?.status;
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
+        status: error.response?.status
+      };
+    }
+  }
+
+  /**
+   * Get user's favorite articles with pagination
+   * @param {number} page - Page number (0-indexed, default: 0)
+   * @param {number} size - Items per page (default: 10)
+   * @param {string} sortBy - Sort field (default: 'updatedAt')
+   * @param {string} sortDirection - Sort direction 'asc' or 'desc' (default: 'desc')
+   * @returns {Promise<Object>} PaginatedResponse with content array and pagination metadata
+   */
+  async getArticleFavorites(page = 0, size = 10, sortBy = 'updatedAt', sortDirection = 'desc') {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('size', size);
+      params.append('sortBy', sortBy);
+      params.append('sortDirection', sortDirection);
+
+      const response = await apiClient.get(`${API_ENDPOINTS.USER.ARTICLE_FAVORITES}?${params.toString()}`);
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      // Return paginated response structure
+      return data || { 
+        content: [], 
+        page: 0, 
+        size: 10, 
+        totalElements: 0, 
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+        first: true,
+        last: true
+      };
+    } catch (error) {
+      console.error('Error fetching article favorites:', error);
+      return { 
+        content: [], 
+        page: 0, 
+        size: 10, 
+        totalElements: 0, 
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+        first: true,
+        last: true
+      };
+    }
+  }
+
+  /**
+   * Remove article from favorites
+   * @param {number} favoriteId - Favorite ID (not article ID)
+   * @returns {Promise<Object>} Delete result
+   */
+  async removeArticleFromFavorites(favoriteId) {
+    if (!favoriteId) {
+      throw new Error('Favorite ID is required');
+    }
+
+    try {
+      const response = await apiClient.delete(
+        API_ENDPOINTS.USER.REMOVE_ARTICLE_FAVORITE(favoriteId)
+      );
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      return {
+        success: true,
+        data: data,
+        message: response.data?.message || 'Article removed from favorites successfully'
+      };
+    } catch (error) {
+      console.error(`Error removing favorite ${favoriteId}:`, error);
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to remove article from favorites';
+      const errorCode = error.response?.data?.code || error.response?.status;
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
         status: error.response?.status
       };
     }

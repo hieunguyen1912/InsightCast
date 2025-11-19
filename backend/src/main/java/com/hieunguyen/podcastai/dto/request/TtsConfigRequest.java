@@ -1,5 +1,7 @@
 package com.hieunguyen.podcastai.dto.request;
 
+import com.hieunguyen.podcastai.enums.SampleRate;
+import com.hieunguyen.podcastai.validator.ValidSampleRate;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,16 +43,9 @@ public class TtsConfigRequest {
     @NotNull(message = "Volume gain is required")
     @DecimalMin(value = "-96.0", message = "Volume gain must be at least -96.0")
     @DecimalMax(value = "16.0", message = "Volume gain must not exceed 16.0")
-    private Double volumeGainDb;
+    private Double volumeGain;
 
-    @NotBlank(message = "Audio encoding is required")
-    @Size(max = 20, message = "Audio encoding must not exceed 20 characters")
-    @Pattern(regexp = "^(MP3|WAV|LINEAR16|OGG_OPUS|MULAW|ALAW)$", 
-             message = "Audio encoding must be one of: MP3, WAV, LINEAR16, OGG_OPUS, MULAW, ALAW")
-    private String audioEncoding;
-
-    @Min(value = 8000, message = "Sample rate must be at least 8000")
-    @Max(value = 48000, message = "Sample rate must not exceed 48000")
-    private Integer sampleRateHertz;
+    @ValidSampleRate
+    private SampleRate sampleRateHertz = SampleRate.RATE_24000;
 
 }

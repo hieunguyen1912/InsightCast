@@ -8,6 +8,7 @@ import com.hieunguyen.podcastai.exception.AppException;
 import com.hieunguyen.podcastai.repository.ArticleImageRepository;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.ImageService;
+import com.hieunguyen.podcastai.service.StorageService;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -34,11 +34,16 @@ public class ImageServiceImpl implements ImageService {
     private final ArticleImageRepository imageRepository;
     private final NewsArticleRepository articleRepository;
     private final SecurityUtils securityUtils;
+    private final StorageService storageService; // Add this
+
 
     @Value("${app.image.storage.path:./uploads/images}")
     private String imageStoragePath;
 
-    @Value("${app.image.max-size:10485760}") // 10MB default
+    @Value("${app.image.storage.type:local}")
+    private String storageType;
+
+    @Value("${app.image.max-size:10485760}")
     private long maxFileSize;
 
     private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
@@ -51,7 +56,6 @@ public class ImageServiceImpl implements ImageService {
 
     @Override
     public ImageResponseDto uploadImage(Long articleId, MultipartFile file) {
-        // Verify article exists and user is the author
         NewsArticle article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
 
@@ -60,35 +64,37 @@ public class ImageServiceImpl implements ImageService {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
 
-        // Validate file
         validateImageFile(file);
 
         try {
-            // Create upload directory if not exists
-            Path uploadDir = Paths.get(imageStoragePath);
-            if (!Files.exists(uploadDir)) {
-                Files.createDirectories(uploadDir);
-            }
-
-            // Generate unique filename
             String originalFilename = file.getOriginalFilename();
-            String extension = getFileExtension(originalFilename);
-            String uniqueFilename = UUID.randomUUID().toString() + "." + extension;
+            String url;
 
-            // Create subdirectory by article ID
-            Path articleDir = uploadDir.resolve(String.valueOf(articleId));
-            if (!Files.exists(articleDir)) {
-                Files.createDirectories(articleDir);
+            if ("cloud".equals(storageType)) {
+                String folderPath = "images/article-" + articleId;
+                url = storageService.uploadFile(file, folderPath);
+            } else {
+                Path uploadDir = Paths.get(imageStoragePath);
+
+                if (!Files.exists(uploadDir)) {
+                    Files.createDirectories(uploadDir);
+                }
+
+                String extension = getFileExtension(originalFilename);
+                String uniqueFilename = UUID.randomUUID().toString() + "." + extension;
+
+                // Create subdirectory by article ID
+                Path articleDir = uploadDir.resolve(String.valueOf(articleId));
+                if (!Files.exists(articleDir)) {
+                    Files.createDirectories(articleDir);
+                }
+
+                Path filePath = articleDir.resolve(uniqueFilename);
+                Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                url = "/api/v1/images/" + articleId + "/" + uniqueFilename;
             }
 
-            // Save file
-            Path filePath = articleDir.resolve(uniqueFilename);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            // Generate URL (relative path or full URL)
-            String url = "/api/v1/images/" + articleId + "/" + uniqueFilename;
-
-            // Save to database
             ArticleImage articleImage = ArticleImage.builder()
                     .url(url)
                     .fileName(originalFilename)
@@ -122,7 +128,7 @@ public class ImageServiceImpl implements ImageService {
 
         return images.stream()
                 .map(this::mapToDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -132,36 +138,45 @@ public class ImageServiceImpl implements ImageService {
         ArticleImage image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new AppException(ErrorCode.IMAGE_NOT_FOUND));
 
-        // Verify user is the article author
         var currentUser = securityUtils.getCurrentUser();
         if (!image.getArticle().getAuthor().getId().equals(currentUser.getId())) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
 
         try {
-            // Delete file from storage
             String url = image.getUrl();
-            if (url != null && url.startsWith("/api/v1/images/")) {
-                // Extract path from URL
-                String[] parts = url.split("/");
-                if (parts.length >= 4) {
-                    String articleId = parts[parts.length - 2];
-                    String filename = parts[parts.length - 1];
-                    Path filePath = Paths.get(imageStoragePath, articleId, filename);
-                    if (Files.exists(filePath)) {
-                        Files.delete(filePath);
-                        log.info("Deleted image file: {}", filePath);
+            if (url != null && !url.isEmpty()) {
+                if ("cloud".equals(storageType)) {
+                    try {
+                        storageService.deleteFile(url);
+                        log.info("Deleted image file from cloud storage: {}", url);
+                    } catch (Exception e) {
+                        log.warn("Failed to delete image from cloud storage: {}", e.getMessage());
+                    }
+                } else {
+                    if (url.startsWith("/api/v1/images/")) {
+                        String[] parts = url.split("/");
+                        if (parts.length >= 4) {
+                            String articleId = parts[parts.length - 2];
+                            String filename = parts[parts.length - 1];
+                            Path filePath = Paths.get(imageStoragePath, articleId, filename);
+                            if (Files.exists(filePath)) {
+                                Files.delete(filePath);
+                                log.info("Deleted image file from local storage: {}", filePath);
+                            }
+                        }
                     }
                 }
             }
 
-            // Delete from database
             imageRepository.delete(image);
             log.info("Image deleted successfully: {}", imageId);
 
         } catch (IOException e) {
             log.error("Error deleting image file: {}", e.getMessage(), e);
-            // Still delete from database even if file deletion fails
+            imageRepository.delete(image);
+        } catch (Exception e) {
+            log.error("Unexpected error deleting image: {}", e.getMessage(), e);
             imageRepository.delete(image);
         }
     }
@@ -183,39 +198,38 @@ public class ImageServiceImpl implements ImageService {
         validateImageFile(file);
 
         try {
-            // Delete old featured image if exists
             String oldFeaturedImage = newsArticle.getFeaturedImage();
             if (oldFeaturedImage != null && !oldFeaturedImage.isEmpty()) {
                 deleteOldFeaturedImage(oldFeaturedImage, newsArticleId);
             }
 
-            // Create upload directory if not exists
-            Path uploadDir = Paths.get(imageStoragePath);
-            if (!Files.exists(uploadDir)) {
-                Files.createDirectories(uploadDir);
-            }
-
-            // Generate unique filename
             String originalFilename = file.getOriginalFilename();
-            String extension = getFileExtension(originalFilename);
-            String uniqueFilename = "featured_" + UUID.randomUUID().toString() + "." + extension;
+            String url;
 
-            // Create subdirectory by article ID
-            Path articleDir = uploadDir.resolve(String.valueOf(newsArticleId));
-            if (!Files.exists(articleDir)) {
-                Files.createDirectories(articleDir);
+            if ("cloud".equals(storageType)) {
+                String folderPath = "images/article-" + newsArticleId;
+                url = storageService.uploadFile(file, folderPath);
+            } else {
+                Path uploadDir = Paths.get(imageStoragePath);
+                if (!Files.exists(uploadDir)) {
+                    Files.createDirectories(uploadDir);
+                }
+                String extension = getFileExtension(originalFilename);
+                String uniqueFilename = "featured_" + UUID.randomUUID().toString() + "." + extension;
+
+                Path articleDir = uploadDir.resolve(String.valueOf(newsArticleId));
+                if (!Files.exists(articleDir)) {
+                    Files.createDirectories(articleDir);
+                }
+
+                Path filePath = articleDir.resolve(uniqueFilename);
+                Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                url = "/api/v1/images/" + newsArticleId + "/" + uniqueFilename;
+
+                log.info("Featured image uploaded successfully for news article: {}", newsArticleId);
             }
 
-            // Save file
-            Path filePath = articleDir.resolve(uniqueFilename);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            // Generate URL (relative path or full URL)
-            String url = "/api/v1/images/" + newsArticleId + "/" + uniqueFilename;
-
-            log.info("Featured image uploaded successfully for news article: {}", newsArticleId);
-
-            // Return ImageResponseDto (caller is responsible for setting URL and saving article)
             return ImageResponseDto.builder()
                     .url(url)
                     .fileName(originalFilename)
@@ -231,15 +245,21 @@ public class ImageServiceImpl implements ImageService {
 
     private void deleteOldFeaturedImage(String oldUrl, Long newsArticleId) {
         try {
-            if (oldUrl != null && oldUrl.startsWith("/api/v1/images/")) {
-                // Extract path from URL
-                String[] parts = oldUrl.split("/");
-                if (parts.length >= 4) {
-                    String filename = parts[parts.length - 1];
-                    Path filePath = Paths.get(imageStoragePath, String.valueOf(newsArticleId), filename);
-                    if (Files.exists(filePath)) {
-                        Files.delete(filePath);
-                        log.info("Deleted old featured image file: {}", filePath);
+
+            if (oldUrl != null) {
+                if ("cloud".equals(storageType)) {
+                    storageService.deleteFile(oldUrl);
+                } else {
+                    if (oldUrl.startsWith("/api/v1/images/")) {
+                        String[] parts = oldUrl.split("/");
+                        if (parts.length >= 4) {
+                            String filename = parts[parts.length - 1];
+                            Path filePath = Paths.get(imageStoragePath, String.valueOf(newsArticleId), filename);
+                            if (Files.exists(filePath)) {
+                                Files.delete(filePath);
+                                log.info("Deleted old featured image file: {}", filePath);
+                            }
+                        }
                     }
                 }
             }

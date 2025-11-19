@@ -5,6 +5,7 @@ import com.hieunguyen.podcastai.dto.request.user.UserStatusUpdateRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.PaginatedResponse;
 import com.hieunguyen.podcastai.dto.response.UserDto;
+import com.hieunguyen.podcastai.enums.UserStatus;
 import com.hieunguyen.podcastai.service.UserService;
 import com.hieunguyen.podcastai.util.PaginationHelper;
 import jakarta.validation.Valid;
@@ -32,16 +33,19 @@ public class AdminUserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDirection) {
+            @RequestParam(defaultValue = "desc") String sortDirection,
+            @RequestParam(required = false) UserStatus status,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String username) {
         
-        log.info("Admin getting all users - page: {}, size: {}", page, size);
+        log.info("Admin getting all users - page: {}, size: {}, status: {}, email: {}, username: {}", 
+                page, size, status, email, username);
         
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
         
-        Page<UserDto> users = userService.getAllUsers(pageable);
+        Page<UserDto> users = userService.getAllUsers(pageable, status, email, username);
         PaginatedResponse<UserDto> paginatedResponse = PaginationHelper.toPaginatedResponse(users);
-        
         return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", paginatedResponse));
     }
 

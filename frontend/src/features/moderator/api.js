@@ -13,12 +13,30 @@ const articleService = {
         };
       }
 
-      if (articleData.featuredImageFile && articleData.featuredImageFile instanceof File) {
+      // Check if we have any files to upload (featuredImage or contentImages)
+      const hasFeaturedImage = articleData.featuredImageFile && articleData.featuredImageFile instanceof File;
+      const hasContentImages = articleData.contentImages && Array.isArray(articleData.contentImages) && articleData.contentImages.length > 0;
+      
+      if (hasFeaturedImage || hasContentImages) {
         const formData = new FormData();
         
-        const { featuredImageFile, ...articleJsonData } = articleData;
+        // Extract files from articleData
+        const { featuredImageFile, contentImages, ...articleJsonData } = articleData;
+        
+        // Append article data as JSON
         formData.append('data', new Blob([JSON.stringify(articleJsonData)], { type: "application/json" }));
-        formData.append('featuredImage', featuredImageFile);
+        
+        // Append featured image if exists
+        if (hasFeaturedImage) {
+          formData.append('featuredImage', featuredImageFile);
+        }
+        
+        // Append content images if exist
+        if (hasContentImages) {
+          contentImages.forEach((file) => {
+            formData.append('contentImages', file);
+          });
+        }
 
         const response = await apiClient.post(
           API_ENDPOINTS.ARTICLES.CREATE, 
@@ -30,7 +48,8 @@ const articleService = {
           data: response.data
         };
       } else {
-        const { featuredImageFile, ...payload } = articleData;
+        // No files, send as JSON
+        const { featuredImageFile, contentImages, ...payload } = articleData;
         
         const response = await apiClient.post(API_ENDPOINTS.ARTICLES.CREATE, payload);
         
@@ -146,19 +165,36 @@ const articleService = {
         };
       }
 
-      if (articleData.featuredImageFile && articleData.featuredImageFile instanceof File) {
+      // Check if we have any files to upload (featuredImage or contentImages)
+      const hasFeaturedImage = articleData.featuredImageFile && articleData.featuredImageFile instanceof File;
+      const hasContentImages = articleData.contentImages && Array.isArray(articleData.contentImages) && articleData.contentImages.length > 0;
+      
+      if (hasFeaturedImage || hasContentImages) {
         const formData = new FormData();
         
-        const { featuredImageFile, ...articleJsonData } = articleData;
+        // Extract files from articleData
+        const { featuredImageFile, contentImages, ...articleJsonData } = articleData;
         
         const updateData = {};
         if (articleJsonData.title !== undefined) updateData.title = articleJsonData.title?.trim();
         if (articleJsonData.description !== undefined) updateData.description = articleJsonData.description?.trim();
+        if (articleJsonData.summary !== undefined) updateData.summary = articleJsonData.summary?.trim() || '';
         if (articleJsonData.content !== undefined) updateData.content = articleJsonData.content;
         if (articleJsonData.categoryId !== undefined) updateData.categoryId = articleJsonData.categoryId ? Number(articleJsonData.categoryId) : null;
         
-        formData.append('data', new Blob([JSON.stringify(articleJsonData)], { type: "application/json" }));
-        formData.append('featuredImage', featuredImageFile);
+        formData.append('data', new Blob([JSON.stringify(updateData)], { type: "application/json" }));
+        
+        // Append featured image if exists
+        if (hasFeaturedImage) {
+          formData.append('featuredImage', featuredImageFile);
+        }
+        
+        // Append content images if exist
+        if (hasContentImages) {
+          contentImages.forEach((file) => {
+            formData.append('contentImages', file);
+          });
+        }
 
         const response = await apiClient.put(API_ENDPOINTS.ARTICLES.UPDATE(id), formData);
         
@@ -180,6 +216,9 @@ const articleService = {
         }
         if (articleData.description !== undefined) {
           payload.description = articleData.description?.trim();
+        }
+        if (articleData.summary !== undefined) {
+          payload.summary = articleData.summary?.trim() || '';
         }
         if (articleData.featuredImage !== undefined) {
           payload.featuredImage = articleData.featuredImage?.trim() || '';
@@ -695,6 +734,247 @@ const articleService = {
       return {
         success: false,
         error: error.response?.data?.message || error.message || 'Failed to upload featured image'
+      };
+    }
+  },
+
+  /**
+   * Upload image for article content
+   * @param {File} file - Image file to upload
+   * @param {number|null} articleId - Article ID (can be null for new articles)
+   * @returns {Promise<Object>} API response with image URL
+   */
+  async uploadImage(file, articleId = null) {
+    try {
+      // Validate file
+      if (!file) {
+        return {
+          success: false,
+          error: 'File is required'
+        };
+      }
+
+      // Allowed image types
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type.toLowerCase())) {
+        return {
+          success: false,
+          error: 'File must be an image (JPEG, JPG, PNG, GIF, or WEBP)'
+        };
+      }
+
+      // Max file size: 10MB
+      const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+      if (file.size > maxFileSize) {
+        return {
+          success: false,
+          error: 'File size must be less than 10MB'
+        };
+      }
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Add articleId if provided
+      if (articleId !== null) {
+        formData.append('articleId', articleId.toString());
+      }
+
+      // Upload image
+      const response = await apiClient.post(
+        API_ENDPOINTS.UPLOAD.IMAGE,
+        formData
+      );
+
+      // Response should contain image URL
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: error.response?.data?.message || 'Invalid file format'
+        };
+      }
+      
+      if (error.response?.status === 413) {
+        return {
+          success: false,
+          error: 'File size too large'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to upload image'
+      };
+    }
+  },
+
+  /**
+   * Generate summary for article content using Gemini AI
+   * @param {string} content - Article content (required)
+   * @param {number} maxLength - Maximum length in words (default: 200)
+   * @param {string} language - Language code (default: "vi")
+   * @returns {Promise<Object>} API response with generated summary string
+   */
+  async generateSummary(content, maxLength = 200, language = 'vi') {
+    try {
+      if (!content || !content.trim()) {
+        return {
+          success: false,
+          error: 'Content is required'
+        };
+      }
+
+      // Strip HTML tags to get plain text for summary generation
+      const plainTextContent = content.replace(/<[^>]*>/g, '').trim();
+      
+      if (!plainTextContent) {
+        return {
+          success: false,
+          error: 'Content cannot be empty'
+        };
+      }
+
+      const payload = {
+        content: plainTextContent,
+        maxLength: maxLength,
+        language: language
+      };
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.ARTICLES.GENERATE_SUMMARY,
+        payload
+      );
+
+      // Backend returns String directly, so response.data should be the summary string
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: error.response?.data?.message || 'Invalid request. Content is required.'
+        };
+      }
+      
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Unauthenticated. Please login again.'
+        };
+      }
+      
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'You don\'t have permission to generate summary'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to generate summary'
+      };
+    }
+  },
+
+  async generateAudioFromSummary(articleId, options = {}) {
+    try {
+      if (!articleId) {
+        return {
+          success: false,
+          error: 'Article ID is required'
+        };
+      }
+
+      const requestBody = {};
+      
+      // Add custom voice settings if provided
+      if (options.customVoiceSettings) {
+        requestBody.customVoiceSettings = options.customVoiceSettings;
+      }
+      
+      // Add optional flags (defaults handled by backend)
+      if (options.enableSummarization !== undefined) {
+        requestBody.enableSummarization = options.enableSummarization;
+      }
+      
+      if (options.enableTranslation !== undefined) {
+        requestBody.enableTranslation = options.enableTranslation;
+      }
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.ARTICLES.GENERATE_AUDIO_FROM_SUMMARY(articleId),
+        Object.keys(requestBody).length > 0 ? requestBody : {}
+      );
+      
+      // Handle both response.data and response.data.data structure
+      const data = response.data?.data || response.data;
+      
+      return {
+        success: true,
+        data: data,
+        message: response.data?.message || 'Audio generation from summary started successfully'
+      };
+    } catch (error) {
+      console.error(`Error generating audio from summary for article ${articleId}:`, error);
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to generate audio from summary';
+      const errorCode = error.response?.data?.code || error.response?.status;
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'Article not found',
+          errorCode: errorCode,
+          status: 404
+        };
+      }
+      
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: errorMessage,
+          errorCode: errorCode,
+          status: 400
+        };
+      }
+      
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'You do not have permission to generate audio for this article',
+          errorCode: errorCode,
+          status: 403
+        };
+      }
+      
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Unauthenticated. Please login again.',
+          errorCode: errorCode,
+          status: 401
+        };
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
+        status: error.response?.status
       };
     }
   }

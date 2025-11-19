@@ -35,9 +35,6 @@ public class UploadController {
                 .body(ApiResponse.created("Image uploaded successfully", image));
     }
 
-    /**
-     * GET /api/v1/articles/{id}/images - Get all images for an article
-     */
     @GetMapping("/articles/{id}/images")
     public ResponseEntity<ApiResponse<List<ImageResponseDto>>> getArticleImages(
             @PathVariable("id") Long articleId) {

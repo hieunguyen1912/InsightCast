@@ -1,6 +1,5 @@
 package com.hieunguyen.podcastai.dto.response;
 
-import com.hieunguyen.podcastai.enums.FavoriteType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,10 +14,9 @@ import java.time.Instant;
 public class UserFavoriteDto {
     
     private Long id;
-    private FavoriteType type;
-    private Long itemId;
-    private String itemTitle;
-    private String itemDescription;
-    private String itemImageUrl;
+    private Long articleId;
+    private String articleTitle;
+    private String articleDescription;
+    private String articleImageUrl;
     private Instant createdAt;
 }

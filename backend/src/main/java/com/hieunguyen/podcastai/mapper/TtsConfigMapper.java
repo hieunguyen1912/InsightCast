@@ -21,6 +21,7 @@ import java.util.List;
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface TtsConfigMapper {
 
+    @Mapping(target = "sampleRateHertz", source = "sampleRateHertz.hertz")
     TtsConfig toEntity(TtsConfigRequest request);
 
     TtsConfigDto toDto(TtsConfig ttsConfig);

@@ -75,12 +75,13 @@ export const authService = {
     }
   },
 
-  async register({ email, password, name }) {
+  async register({ email, password, username, confirmPassword }) {
     try {
       const response = await apiClient.post('/auth/register', {
         email,
         password,
-        name
+        username,
+        confirmPassword
       });
       
       return {

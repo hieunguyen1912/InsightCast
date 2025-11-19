@@ -136,3 +136,28 @@ export function formatNewsTime(date) {
   
   return relativeTime;
 }
+
+/**
+ * Format date to YYYY-MM-DD format for API (Java LocalDate)
+ * Converts date to date-only string without time/timezone information
+ * @param {Date|string} date - Date to format
+ * @returns {string} Date string in YYYY-MM-DD format
+ */
+export function formatDateForAPI(date) {
+  if (!date) return null;
+  
+  const dateObj = date instanceof Date ? date : new Date(date);
+  
+  // Check if date is valid
+  if (isNaN(dateObj.getTime())) {
+    console.warn('Invalid date provided to formatDateForAPI:', date);
+    return null;
+  }
+  
+  // Format as YYYY-MM-DD (LocalDate format for Java backend)
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}

@@ -22,7 +22,6 @@ public abstract class BaseNewsArticleResponse {
     private String featuredImage;
     private Long viewCount;
     private Long likeCount;
-    private Long shareCount;
     private ArticleStatus status;
     private String rejectionReason;
 }

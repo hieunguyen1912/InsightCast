@@ -1,27 +1,22 @@
 package com.hieunguyen.podcastai.controller;
 
-import com.hieunguyen.podcastai.dto.request.user.UserFavoriteRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
+import com.hieunguyen.podcastai.dto.response.PaginatedResponse;
 import com.hieunguyen.podcastai.dto.response.UserFavoriteDto;
 import com.hieunguyen.podcastai.service.UserFavoriteService;
 
-import jakarta.validation.Valid;
 
+import com.hieunguyen.podcastai.util.PaginationHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/user/me/favorites")
@@ -32,40 +27,31 @@ public class UserFavoriteController {
     private final UserFavoriteService userFavoriteService;
 
     @GetMapping
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<List<UserFavoriteDto>>> getUserFavorites() {
-        log.info("Getting user favorites");
-        List<UserFavoriteDto> favorites = userFavoriteService.getUserFavorites();
-        log.info("Successfully retrieved {} favorites", favorites.size());
-        return ResponseEntity.ok(ApiResponse.success("Favorites retrieved successfully", favorites));
+    public ResponseEntity<ApiResponse<PaginatedResponse<UserFavoriteDto>>> getUserFavorites(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection
+    ) {
+
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<UserFavoriteDto> favorites = userFavoriteService.getUserFavorites(pageable);
+        PaginatedResponse<UserFavoriteDto> response = PaginationHelper.toPaginatedResponse(favorites);
+
+        return ResponseEntity.ok(ApiResponse.success("Favorites retrieved successfully", response));
     }
 
-    @PostMapping
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<UserFavoriteDto>> addFavorite(@Valid @RequestBody UserFavoriteRequest request) {
-        log.info("Adding favorite");
-        UserFavoriteDto favorite = userFavoriteService.addFavorite(request);
-        log.info("Successfully added favorite");
+    @PostMapping("/{articleId}")
+    public ResponseEntity<ApiResponse<UserFavoriteDto>> addFavorite(@PathVariable Long articleId) {
+        UserFavoriteDto favorite = userFavoriteService.addFavorite(articleId);
         return ResponseEntity.ok(ApiResponse.success("Favorite added successfully", favorite));
     }
 
     @DeleteMapping("/{favoriteId}")
-    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<Void>> removeFavorite(@PathVariable Long favoriteId) {
-        log.info("Removing favorite with ID: {}", favoriteId);
         userFavoriteService.removeFavorite(favoriteId);
-        log.info("Successfully removed favorite");
-        return ResponseEntity.ok(ApiResponse.success("Favorite removed successfully", null));
-    }
-
-    @DeleteMapping("/by-item")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<Void>> removeFavoriteByItem(
-            @RequestParam Long itemId, 
-            @RequestParam com.hieunguyen.podcastai.enums.FavoriteType type) {
-        log.info("Removing favorite by item ID: {} and type: {}", itemId, type);
-        userFavoriteService.removeFavoriteByItem(itemId, type);
-        log.info("Successfully removed favorite by item");
         return ResponseEntity.ok(ApiResponse.success("Favorite removed successfully", null));
     }
 }

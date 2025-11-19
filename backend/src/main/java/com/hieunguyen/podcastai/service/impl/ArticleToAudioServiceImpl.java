@@ -17,6 +17,7 @@ import com.hieunguyen.podcastai.mapper.AudioMapper;
 import com.hieunguyen.podcastai.mapper.TtsConfigMapper;
 import com.hieunguyen.podcastai.repository.AudioRepository;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
+import com.hieunguyen.podcastai.repository.TtsConfigRepository;
 import com.hieunguyen.podcastai.repository.UserRepository;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Storage;
@@ -26,12 +27,15 @@ import com.hieunguyen.podcastai.util.ArticleToSsmlConverter;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -42,12 +46,14 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
     private final AudioRepository audioRepository;
     private final NewsArticleRepository articleRepository;
     private final UserRepository userRepository;
+    private final TtsConfigRepository ttsConfigRepository;
     private final SecurityUtils securityUtils;
     private final TtsConfigMapper ttsConfigMapper;
     private final GoogleTtsService googleTtsService;
     private final ArticleToSsmlConverter articleToSsmlConverter;
     private final Storage storage;
     private final AudioMapper audioMapper;
+    private final NewsArticleRepository newsArticleRepository;
 
     @Override
     public AudioFileDto generateAudioFromArticle(Long articleId, AudioRequest request) {
@@ -56,6 +62,7 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
 
         // 1. Get current user
         User currentUser = securityUtils.getCurrentUser();
+        log.info("current user: {}", currentUser.getDefaultTtsConfig());
 
         // 2. Find and validate article
         NewsArticle article = articleRepository.findById(articleId)
@@ -72,7 +79,7 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
         String ssmlContent = articleToSsmlConverter.convertToSsml(article.getContent(), article.getTitle());
         
         // 5. Generate file name (use same name for both GCS and database)
-        String fileName = generateAudioFileName(article, voiceSettings);
+        String fileName = generateAudioFileName(article, voiceSettings, false);
         
         // 6. Generate audio using Google TTS Long Audio Synthesis
         LongAudioSynthesisRequest longAudioSynthesisRequest = LongAudioSynthesisRequest.builder()
@@ -104,6 +111,53 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
         return audioMapper.toDto(savedAudioFile);
     }
 
+    @Override
+    public AudioFileDto generateAudioFromSummary(Long articleId, AudioRequest request) {
+        log.info("Generating audio from summary for article: {} with config: {}", articleId, 
+                request.getCustomVoiceSettings() != null ? "custom" : "default");
+
+        User currentUser = securityUtils.getCurrentUser();
+        log.info("Current user: {}", currentUser.getEmail());
+
+        NewsArticle article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+
+        if (article.getSummary() == null || article.getSummary().trim().isEmpty()) {
+            throw new AppException(ErrorCode.SUMMARY_NOT_AVAILABLE);
+        }
+
+        VoiceSettingsRequest voiceSettings = resolveVoiceSettings(request, currentUser);
+        
+        String ssmlContent = articleToSsmlConverter.convertPlainTextToSsml(article.getSummary(), article.getTitle());
+        
+        String fileName = generateAudioFileName(article, voiceSettings, true);
+        
+        LongAudioSynthesisRequest longAudioSynthesisRequest = LongAudioSynthesisRequest.builder()
+                .text(ssmlContent)
+                .voiceSettings(voiceSettings)
+                .outputFileName(fileName)
+                .build();
+        
+        LongAudioSynthesisResponse synthesisResponse = googleTtsService.synthesizeLongAudio(longAudioSynthesisRequest);
+        
+        AudioFile audioFile = AudioFile.builder()
+                .newsArticle(article)
+                .user(currentUser)
+                .fileName(fileName)
+                .status(ProcessingStatus.GENERATING_AUDIO)
+                .operationName(synthesisResponse.getOperationName())
+                .gcsUri(synthesisResponse.getOutputGcsUri())
+                .ttsConfig(getTtsConfigFromRequest(request, currentUser))
+                .build();
+        
+        AudioFile savedAudioFile = audioRepository.save(audioFile);
+        
+        log.info("Long audio synthesis from summary started for article: {}, operation: {}, audio file ID: {}", 
+                articleId, synthesisResponse.getOperationName(), savedAudioFile.getId());
+        
+        return audioMapper.toDto(savedAudioFile);
+    }
+
     private VoiceSettingsRequest resolveVoiceSettings(AudioRequest request, User user) {
         // Priority 1: Custom voice settings
         if (request.getCustomVoiceSettings() != null) {
@@ -113,11 +167,11 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
         
         // Priority 2: Default TTS Config from user
         log.debug("Using default TTS config from user");
-
-
-        TtsConfig defaultTtsConfig = user.getDefaultTtsConfig();
         
-        if ( defaultTtsConfig != null) {
+        TtsConfig defaultTtsConfig = ttsConfigRepository.findByUser(user)
+                .orElseThrow(() -> new AppException(ErrorCode.TTS_CONFIG_NOT_FOUND));
+        
+        if (defaultTtsConfig != null) {
             log.debug("Found default TTS config: {}", defaultTtsConfig.getId());
             return ttsConfigMapper.toVoiceSettingsRequest(defaultTtsConfig);
         }
@@ -386,11 +440,6 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
             }
         }
         
-        if (audioFile.getStatus() == ProcessingStatus.GENERATING_AUDIO) {
-            log.warn("Cannot delete audio file {} - status is GENERATING_AUDIO", audioFileId);
-            throw new AppException(ErrorCode.AUDIO_FILE_CANNOT_BE_DELETED);
-        }
-        
         if (audioFile.getGcsUri() != null && !audioFile.getGcsUri().isEmpty()) {
             try {
                 String[] parts = parseGcsUri(audioFile.getGcsUri());
@@ -407,14 +456,45 @@ public class ArticleToAudioServiceImpl implements ArticleToAudioService {
         log.info("Successfully deleted audio file ID: {}", audioFileId);
     }
 
-    private String generateAudioFileName(NewsArticle article, VoiceSettingsRequest voiceSettings) {
+    @Override
+    public List<AudioFileDto> getAudioFiles(Long articleId) {
+        NewsArticle newsArticle = newsArticleRepository.findById(articleId)
+                .orElseThrow(() -> new AppException(ErrorCode.ARTICLE_NOT_FOUND));
+
+        User currentUser = securityUtils.getCurrentUser();
+
+        List<AudioFile> audioFiles = audioRepository.findByUserAndNewsArticle(currentUser, newsArticle);
+
+        return audioMapper.toDtoList(audioFiles);
+    }
+
+    @Override
+    public Page<AudioFileDto> getAudioFilesByUser(Pageable pageable) {
+        User currentUser = securityUtils.getCurrentUser();
+        Page<AudioFile> audioFiles = audioRepository.findByUser(currentUser, pageable);
+        return audioFiles.map(audioMapper::toDto);
+    }
+
+    /**
+     * Generate file name for audio file
+     * 
+     * @param article The article
+     * @param voiceSettings Voice settings
+     * @param isFromSummary Whether the audio is generated from summary (true) or full article (false)
+     * @return Generated file name
+     */
+    private String generateAudioFileName(NewsArticle article, VoiceSettingsRequest voiceSettings, boolean isFromSummary) {
         String timestamp = String.valueOf(Instant.now().toEpochMilli());
         String sanitizedTitle = article.getTitle()
                 .replaceAll("[^a-zA-Z0-9\\s]", "")
                 .replaceAll("\\s+", "-")
                 .toLowerCase();
-        return String.format("%s-%s-%s.wav", 
-                sanitizedTitle.substring(0, Math.min(50, sanitizedTitle.length())),
+        
+        int maxTitleLength = isFromSummary ? 40 : 50;
+        String prefix = isFromSummary ? "%s-summary-%s-%s.wav" : "%s-%s-%s.wav";
+        
+        return String.format(prefix, 
+                sanitizedTitle.substring(0, Math.min(maxTitleLength, sanitizedTitle.length())),
                 voiceSettings.getVoiceName().replace("-", "_"),
                 timestamp);
     }

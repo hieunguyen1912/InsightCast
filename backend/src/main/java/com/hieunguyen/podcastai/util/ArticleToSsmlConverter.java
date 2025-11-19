@@ -12,22 +12,12 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
-/**
- * Utility class to convert HTML article content to SSML format
- */
 @Component
 @Slf4j
 public class ArticleToSsmlConverter {
     
-    private static final int MAX_SSML_LENGTH = 5000; // Google TTS limit for SSML
-    
-    /**
-     * Convert HTML article content to SSML
-     * 
-     * @param htmlContent HTML content from article
-     * @param title Article title (will be emphasized)
-     * @return SSML formatted string
-     */
+    private static final int MAX_SSML_LENGTH = 5000;
+
     public String convertToSsml(String htmlContent, String title) {
         try {
             Document doc = Jsoup.parse(htmlContent);
@@ -138,10 +128,7 @@ public class ArticleToSsmlConverter {
                 break;
         }
     }
-    
-    /**
-     * Process list elements
-     */
+
     private void processList(Element list, StringBuilder ssml) {
         Elements items = list.select("li");
         for (Element item : items) {
@@ -151,9 +138,31 @@ public class ArticleToSsmlConverter {
         ssml.append("<break time=\"0.5s\"/>");
     }
     
-    /**
-     * Escape XML special characters
-     */
+
+    public String convertPlainTextToSsml(String plainText, String title) {
+        if (plainText == null || plainText.trim().isEmpty()) {
+            return "<speak></speak>";
+        }
+        
+        StringBuilder ssml = new StringBuilder();
+        ssml.append("<speak>");
+        
+        // Add title with emphasis
+        if (title != null && !title.trim().isEmpty()) {
+            ssml.append("<emphasis level=\"strong\">")
+                .append(escapeXml(title))
+                .append("</emphasis>")
+                .append("<break time=\"1s\"/>");
+        }
+        
+        String escapedText = escapeXml(plainText);
+        escapedText = escapedText.replace("\n", "<break time=\"0.5s\"/>");
+        ssml.append(escapedText);
+        
+        ssml.append("</speak>");
+        return ssml.toString();
+    }
+
     private String escapeXml(String text) {
         if (text == null) return "";
         
@@ -163,13 +172,7 @@ public class ArticleToSsmlConverter {
                    .replace("\"", "&quot;")
                    .replace("'", "&apos;");
     }
-    
-    /**
-     * Split SSML into chunks if it exceeds the limit
-     * 
-     * @param ssml Full SSML content
-     * @return List of SSML chunks
-     */
+
     public List<String> splitSsmlIntoChunks(String ssml) {
         List<String> chunks = new ArrayList<>();
         

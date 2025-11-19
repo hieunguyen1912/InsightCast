@@ -95,11 +95,11 @@ public class GoogleCloudTtsConfig {
                     .build();
 
             TextToSpeechClient client = TextToSpeechClient.create(settings);
-            log.info("✓ TextToSpeechClient created successfully");
+            log.info("TextToSpeechClient created successfully");
             return client;
 
         } catch (Exception e) {
-            log.error("✗ Failed to create client: {}", e.getMessage(), e);
+            log.error("Failed to create client: {}", e.getMessage(), e);
             throw e;
         }
     }
@@ -119,11 +119,11 @@ public class GoogleCloudTtsConfig {
                     .build();
 
             TextToSpeechLongAudioSynthesizeClient client = TextToSpeechLongAudioSynthesizeClient.create(settings);
-            log.info("✓ TextToSpeechLongAudioSynthesizeClient created successfully");
+            log.info("TextToSpeechLongAudioSynthesizeClient created successfully");
             return client;
 
         } catch (Exception e) {
-            log.error("✗ Failed to create long audio client: {}", e.getMessage(), e);
+            log.error("Failed to create long audio client: {}", e.getMessage(), e);
             throw e;
         }
     }
@@ -143,11 +143,11 @@ public class GoogleCloudTtsConfig {
                     .build()
                     .getService();
             
-            log.info("✓ Google Cloud Storage client created successfully");
+            log.info("Google Cloud Storage client created successfully");
             return storage;
 
         } catch (Exception e) {
-            log.error("✗ Failed to create Storage client: {}", e.getMessage(), e);
+            log.error("Failed to create Storage client: {}", e.getMessage(), e);
             throw e;
         }
     }

@@ -7,8 +7,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { PermissionGuard } from '../common';
 import { Search, Menu, ChevronDown, User, LogOut, FileText, Shield, ChevronRight } from 'lucide-react';
 import categoryService from '../../features/category/api';
+import NotificationBell from '../../features/notification/components/NotificationBell';
 
 function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -219,6 +221,9 @@ function Header() {
             
             {/* User Menu / Auth Buttons */}
             <div className="flex items-center space-x-4">
+              {isAuthenticated && (
+                <NotificationBell />
+              )}
               {isAuthenticated ? (
                 <div className="relative" ref={userMenuRef}>
                   {/* User Menu Button */}
@@ -258,23 +263,27 @@ function Header() {
                         Dashboard
                       </Link>
                       
-                      <Link
-                        to="/moderator"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        <FileText className="h-4 w-4 mr-3" />
-                        Moderator Panel
-                      </Link>
+                      <PermissionGuard requiredRoles={['MODERATOR', 'ADMIN']}>
+                        <Link
+                          to="/moderator"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <FileText className="h-4 w-4 mr-3" />
+                          Moderator Panel
+                        </Link>
+                      </PermissionGuard>
                       
-                      <Link
-                        to="/admin"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        <Shield className="h-4 w-4 mr-3" />
-                        Admin Panel
-                      </Link>
+                      <PermissionGuard requiredRoles={['ADMIN']}>
+                        <Link
+                          to="/admin"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <Shield className="h-4 w-4 mr-3" />
+                          Admin Panel
+                        </Link>
+                      </PermissionGuard>
                       
                       <button
                         onClick={handleLogout}

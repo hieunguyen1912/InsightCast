@@ -42,13 +42,12 @@ public class TtsConfig extends BaseEntity {
     private String audioEncoding;
 
     @Column(name = "sample_rate_hertz")
-    private Integer sampleRateHertz; // 8000, 16000, 22050, 44100
+    private Integer sampleRateHertz;
 
-    // Relationships
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne(mappedBy = "defaultTtsConfig", cascade = CascadeType.ALL)
     private User user;
 
     @OneToMany(mappedBy = "ttsConfig", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<AudioFile> audioFiles = new ArrayList<>();
 }

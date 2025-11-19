@@ -12,20 +12,28 @@ import {
   Shield,
   User as UserIcon,
   Mail,
-  Calendar
+  Calendar,
+  Filter,
+  X
 } from 'lucide-react';
 import { Button, Input, Spinner, Alert, ConfirmModal, Modal, StatusBadge } from '../../../components/common';
 import adminService from '../api';
+import { formatDateForAPI } from '../../../utils/formatTime';
 
 
 function UserManagement({ onStatsChange }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    email: '',
+    username: '',
+    status: ''
+  });
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, userId: null, userName: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [editMode, setEditMode] = useState('roles'); // 'roles' or 'info'
@@ -43,22 +51,38 @@ function UserManagement({ onStatsChange }) {
     avatarUrl: ''
   });
 
+  // Load roles once on mount
   useEffect(() => {
-    loadUsers();
     loadRoles();
-  }, [currentPage]);
+  }, []);
+
+  // Load users when page or filters change (with debounce for email/username)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadUsers();
+    }, filters.email || filters.username ? 500 : 0); // Debounce only for text inputs
+
+    return () => clearTimeout(timer);
+  }, [currentPage, filters.status, filters.email, filters.username]);
 
   const loadUsers = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await adminService.getUsers({
+      const params = {
         page: currentPage,
         size: 10,
         sortBy: 'createdAt',
         sortDirection: 'desc'
-      });
+      };
+
+      // Add filters if provided
+      if (filters.status) params.status = filters.status;
+      if (filters.email) params.email = filters.email;
+      if (filters.username) params.username = filters.username;
+
+      const result = await adminService.getUsers(params);
       
       if (result.success) {
         const data = result.data?.data || result.data || {};
@@ -107,13 +131,18 @@ function UserManagement({ onStatsChange }) {
       }
     } else if (mode === 'info') {
       // Populate form with user data
+      // Format dateOfBirth to YYYY-MM-DD for input type="date"
+      const dateOfBirthFormatted = user.dateOfBirth 
+        ? formatDateForAPI(user.dateOfBirth) || ''
+        : '';
+      
       setUserFormData({
         username: user.username || '',
         email: user.email || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         phoneNumber: user.phoneNumber || '',
-        dateOfBirth: user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
+        dateOfBirth: dateOfBirthFormatted,
         avatarUrl: user.avatarUrl || ''
       });
     }
@@ -151,8 +180,17 @@ function UserManagement({ onStatsChange }) {
       if (userFormData.firstName.trim()) payload.firstName = userFormData.firstName.trim();
       if (userFormData.lastName.trim()) payload.lastName = userFormData.lastName.trim();
       if (userFormData.phoneNumber.trim()) payload.phoneNumber = userFormData.phoneNumber.trim();
-      if (userFormData.dateOfBirth.trim()) payload.dateOfBirth = userFormData.dateOfBirth.trim();
+      // Format dateOfBirth to YYYY-MM-DD for API (LocalDate)
+      if (userFormData.dateOfBirth.trim()) {
+        const formattedDate = formatDateForAPI(userFormData.dateOfBirth);
+        if (formattedDate) payload.dateOfBirth = formattedDate;
+      }
       if (userFormData.avatarUrl.trim()) payload.avatarUrl = userFormData.avatarUrl.trim();
+      
+      // Include version field if it exists in editingUser
+      if (editingUser.version !== undefined) {
+        payload.version = editingUser.version;
+      }
 
       const result = await adminService.updateUser(editingUser.id, payload);
       
@@ -226,20 +264,22 @@ function UserManagement({ onStatsChange }) {
     }
   };
 
-  const handleSearch = () => {
-    setCurrentPage(0);
-    loadUsers();
+  const handleFilterChange = (name, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setCurrentPage(0); // Reset to first page when filter changes
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm !== undefined) {
-        handleSearch();
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const clearFilters = () => {
+    setFilters({
+      email: '',
+      username: '',
+      status: ''
+    });
+    setCurrentPage(0);
+  };
 
   const getRoleNames = (user) => {
     if (user.roles && Array.isArray(user.roles)) {
@@ -267,32 +307,103 @@ function UserManagement({ onStatsChange }) {
 
   return (
     <div className="space-y-4">
-      {/* Header with Search */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search users by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+      {/* Header with Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Users Management</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+                showFilters 
+                  ? 'bg-orange-500 text-white border-orange-500' 
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+            </button>
+            <button
+              onClick={loadUsers}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
           </div>
         </div>
-        
-        <button
-          onClick={() => {
-            setSearchTerm('');
-            setCurrentPage(0);
-            loadUsers();
-          }}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
-        >
-          <RefreshCw className="h-5 w-5 mr-2" />
-          Refresh
-        </button>
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+              <button
+                onClick={clearFilters}
+                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              >
+                <X className="h-4 w-4" />
+                Clear All
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value="">All Status</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="DELETED">Deleted</option>
+                </select>
+              </div>
+
+              {/* Email Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters.email}
+                    onChange={(e) => handleFilterChange('email', e.target.value)}
+                    placeholder="Search by email..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Case-insensitive search</p>
+              </div>
+
+              {/* Username Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Username
+                </label>
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters.username}
+                    onChange={(e) => handleFilterChange('username', e.target.value)}
+                    placeholder="Search by username..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Case-insensitive search</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Error Message */}
@@ -543,8 +654,8 @@ function UserManagement({ onStatsChange }) {
           <UserIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
           <p className="text-gray-600">
-            {searchTerm 
-              ? 'No users match your search criteria' 
+            {(filters.email || filters.username || filters.status)
+              ? 'No users match your filter criteria' 
               : 'No users found in the system'
             }
           </p>

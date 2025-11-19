@@ -14,7 +14,18 @@ public interface NewsArticleMapper {
 
     @Mapping(target = "category", source = ".", qualifiedByName = "mapCategory")
     @Mapping(target = "author", source = "author")
+    @Mapping(target = "contentImageUrls", source = "articleImages", qualifiedByName = "mapContentImageUrls")
     NewsArticleResponse toDto(NewsArticle entity);
+
+    @Named("mapContentImageUrls")
+    default List<String> mapContentImageUrls(List<com.hieunguyen.podcastai.entity.ArticleImage> articleImages) {
+        if (articleImages == null || articleImages.isEmpty()) {
+            return List.of();
+        }
+        return articleImages.stream()
+                .map(com.hieunguyen.podcastai.entity.ArticleImage::getUrl)
+                .toList();
+    }
 
     @Mapping(target = "categoryName", source = "category.name")
     @Mapping(target = "authorName", source = "author", qualifiedByName = "mapAuthorName")

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useRole } from '../../../hooks/useRole';
 import { FilePlus } from 'lucide-react';
 import ModeratorSidebar from '../components/ModeratorSidebar';
 import ModeratorOverview from '../components/ModeratorOverview';
@@ -16,6 +17,7 @@ import articleService from '../api';
 function ModeratorPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { hasRole } = useRole(['MODERATOR', 'ADMIN']);
   
   const [activeModule, setActiveModule] = useState('overview');
   const [stats, setStats] = useState({
@@ -28,19 +30,51 @@ function ModeratorPage() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user has MODERATOR role
+  // Check if user has MODERATOR or ADMIN role
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
 
-    // TODO: Add proper role check when user object includes roles
-    // For now, we assume authenticated users can access moderator page
-    // In production, you should check: user.roles?.includes('MODERATOR')
+    // Kiểm tra quyền MODERATOR hoặc ADMIN - nếu không có quyền sẽ bị RoleProtectedRoute redirect
+    if (!hasRole) {
+      navigate('/');
+      return;
+    }
     
     loadStats();
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, hasRole, navigate]);
+
+  // Helper function to extract total count from API response
+  const getTotalCount = (result) => {
+    if (!result.success) return 0;
+    
+    // Handle nested response structure: result.data.data
+    const responseData = result.data?.data || result.data;
+    
+    // If response has totalElements (paginated response), use it
+    if (responseData?.totalElements !== undefined) {
+      return responseData.totalElements;
+    }
+    
+    // Fallback: count items in array (for backward compatibility)
+    if (Array.isArray(responseData)) {
+      return responseData.length;
+    }
+    
+    // Alternative structure: items array
+    if (Array.isArray(responseData?.items)) {
+      return responseData.items.length;
+    }
+    
+    // Alternative structure: content array
+    if (Array.isArray(responseData?.content)) {
+      return responseData.content.length;
+    }
+    
+    return 0;
+  };
 
   // Load statistics
   const loadStats = async () => {
@@ -48,20 +82,21 @@ function ModeratorPage() {
     
     try {
       // Load all article lists to calculate stats
+      // Use size: 1 to minimize data transfer since we only need totalElements
       const [allResult, draftsResult, submittedResult, approvedResult, rejectedResult] = await Promise.all([
-        articleService.getMyAll(),
-        articleService.getMyDrafts(),
-        articleService.getMySubmitted(),
-        articleService.getMyApproved(),
-        articleService.getMyRejected()
+        articleService.getMyAll({ page: 0, size: 1 }),
+        articleService.getMyDrafts({ page: 0, size: 1 }),
+        articleService.getMySubmitted({ page: 0, size: 1 }),
+        articleService.getMyApproved({ page: 0, size: 1 }),
+        articleService.getMyRejected({ page: 0, size: 1 })
       ]);
 
       setStats({
-        all: allResult.success ? (Array.isArray(allResult.data) ? allResult.data.length : allResult.data?.items?.length || 0) : 0,
-        drafts: draftsResult.success ? (Array.isArray(draftsResult.data) ? draftsResult.data.length : draftsResult.data?.items?.length || 0) : 0,
-        submitted: submittedResult.success ? (Array.isArray(submittedResult.data) ? submittedResult.data.length : submittedResult.data?.items?.length || 0) : 0,
-        approved: approvedResult.success ? (Array.isArray(approvedResult.data) ? approvedResult.data.length : approvedResult.data?.items?.length || 0) : 0,
-        rejected: rejectedResult.success ? (Array.isArray(rejectedResult.data) ? rejectedResult.data.length : rejectedResult.data?.items?.length || 0) : 0
+        all: getTotalCount(allResult),
+        drafts: getTotalCount(draftsResult),
+        submitted: getTotalCount(submittedResult),
+        approved: getTotalCount(approvedResult),
+        rejected: getTotalCount(rejectedResult)
       });
     } catch (error) {
       console.error('Error loading stats:', error);

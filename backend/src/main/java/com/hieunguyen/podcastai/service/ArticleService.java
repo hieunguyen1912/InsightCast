@@ -1,18 +1,24 @@
 package com.hieunguyen.podcastai.service;
 
 import com.hieunguyen.podcastai.dto.request.CreateArticleRequest;
+import com.hieunguyen.podcastai.dto.request.GenerateSummaryRequest;
 import com.hieunguyen.podcastai.dto.request.RejectArticleRequest;
 import com.hieunguyen.podcastai.dto.request.UpdateArticleRequest;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
+import com.hieunguyen.podcastai.enums.ArticleStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface ArticleService {
     
     // Create article (DRAFT status)
-    NewsArticleResponse createArticle(CreateArticleRequest request, MultipartFile featuredImage);
+    NewsArticleResponse createArticle(CreateArticleRequest request,
+                                      MultipartFile featuredImage,
+                                      List<MultipartFile> contentImages);
     
     // Get my articles by status
     Page<NewsArticleSummaryResponse> getMyDrafts(Pageable pageable);
@@ -46,5 +52,17 @@ public interface ArticleService {
 
     Page<NewsArticleSummaryResponse> getArticlesByCategory(Long id, Pageable pageable);
 
+    String generateSummary(GenerateSummaryRequest request);
+    
+    // Admin methods for managing all articles
+    Page<NewsArticleSummaryResponse> getAllArticles(Pageable pageable, ArticleStatus status, String categoryName, String authorName);
+    
+    NewsArticleResponse getArticleByIdForAdmin(Long id);
+    
+    Page<NewsArticleSummaryResponse> getArticlesByStatus(ArticleStatus status, Pageable pageable);
+    
+    void deleteArticleForAdmin(Long id);
+    
+    NewsArticleResponse updateArticleForAdmin(Long id, UpdateArticleRequest request, MultipartFile featuredImage);
 }
 

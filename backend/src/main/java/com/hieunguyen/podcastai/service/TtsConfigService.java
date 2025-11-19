@@ -8,7 +8,7 @@ import com.hieunguyen.podcastai.dto.response.TtsConfigDto;
 public interface TtsConfigService {
 
     TtsConfigDto createTtsConfig(TtsConfigRequest request);
-    TtsConfigDto getTtsConfigById(Long id);
+    TtsConfigDto getTtsConfigByUser();
     TtsConfigDto updateTtsConfig(Long id, TtsConfigUpdateRequest request);
     void deleteTtsConfig(Long id);
 }

@@ -3,6 +3,7 @@ package com.hieunguyen.podcastai.service.impl;
 import com.hieunguyen.podcastai.dto.response.NewsArticleResponse;
 import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 import com.hieunguyen.podcastai.entity.NewsArticle;
+import com.hieunguyen.podcastai.enums.ArticleStatus;
 import com.hieunguyen.podcastai.mapper.NewsArticleMapper;
 import com.hieunguyen.podcastai.repository.NewsArticleRepository;
 import com.hieunguyen.podcastai.service.NewsArticleService;
@@ -16,13 +17,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
+
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
 
 @Service
 @RequiredArgsConstructor
@@ -32,44 +33,6 @@ public class NewsArticleServiceImpl implements NewsArticleService {
     private final NewsArticleRepository newsArticleRepository;
     private final NewsArticleMapper newsArticleMapper;
     private final SearchValidator validator;
-
-    @Override
-    public Page<NewsArticleResponse> searchNewsBySpecification(Pageable pageable, String... search) {
-        log.info("Searching news articles with specification - search criteria: {}", (Object) search);
-        
-        SpecificationsBuilder<NewsArticle> builder = new SpecificationsBuilder<>();
-
-        if (search.length > 0) {
-            Pattern pattern = Pattern.compile("(\\w+(?:\\.\\w+)*)([<:>~!])(\\*?)([^*]*)(\\*?)");
-            for (String s : search) {
-                Matcher matcher = pattern.matcher(s);
-                if (matcher.find()) {
-                    String key = matcher.group(1);
-                    String operation = matcher.group(2);
-                    String prefix = matcher.group(3);
-                    String value = matcher.group(4);
-                    String suffix = matcher.group(5);
-
-                    log.debug("Parsed search criteria - key: {}, operation: {}, value: {}, prefix: {}, suffix: {}", 
-                            key, operation, value, prefix, suffix);
-
-                    builder.with(key, operation, value, prefix, suffix);
-                }
-            }
-
-            Page<NewsArticle> articles = newsArticleRepository.findAll(Objects.requireNonNull(builder.build()), pageable);
-            log.info("Found {} news articles matching search criteria", articles.getTotalElements());
-            
-            // Convert to DTO
-            return articles.map(newsArticleMapper::toDto);
-        }
-        
-        log.info("No search criteria provided, returning all news articles");
-        Page<NewsArticle> articles = newsArticleRepository.findAll(pageable);
-        
-        // Convert to DTO
-        return articles.map(newsArticleMapper::toDto);
-    }
 
     @Override
     public Page<NewsArticleResponse> searchFullText(
@@ -82,7 +45,9 @@ public class NewsArticleServiceImpl implements NewsArticleService {
         log.info("keyword: {}, categoryId: {}, fromDate: {}, toDate: {}",
                 keyword, categoryId, fromDate, toDate);
 
-        String sanitized = validator.sanitizeKeyword(keyword);
+        String sanitized = (keyword != null && !keyword.isBlank())
+                ? validator.sanitizeKeyword(keyword)
+                : null;
 
         Page<NewsArticle> articles = newsArticleRepository.fullTextSearch(sanitized, categoryId, fromDate, toDate, pageable);
 
@@ -91,15 +56,26 @@ public class NewsArticleServiceImpl implements NewsArticleService {
 
     @Override
     public Page<NewsArticleSummaryResponse> findByCategoryId(Long categoryId, Pageable pageable) {
-        Page<NewsArticle> newsArticles = newsArticleRepository.findByCategoryId(categoryId, pageable);
+        Page<NewsArticle> newsArticles = newsArticleRepository.findByCategoryIdAndStatus(categoryId, ArticleStatus.APPROVED, pageable);
         return newsArticles.map(newsArticleMapper::toSummaryDto);
     }
 
     @Override
+    @Transactional
     public Optional<NewsArticleResponse> getNewsById(Long id) {
         log.info("Getting news article by ID: {}", id);
-        return newsArticleRepository.findById(id)
-            .map(newsArticleMapper::toDto);
+        Optional<NewsArticle> articleOpt = newsArticleRepository.findByIdAndStatus(id, ArticleStatus.APPROVED);
+        
+        if (articleOpt.isPresent()) {
+            NewsArticle article = articleOpt.get();
+            // Increment view count
+            article.setViewCount(article.getViewCount() + 1);
+            newsArticleRepository.save(article);
+            log.info("Incremented view count for article ID: {}, new count: {}", id, article.getViewCount());
+            return Optional.of(newsArticleMapper.toDto(article));
+        }
+        
+        return Optional.empty();
     }
 
     @Override
@@ -107,7 +83,7 @@ public class NewsArticleServiceImpl implements NewsArticleService {
         log.info("Getting latest {} news articles", limit);
         
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "publishedAt"));
-        Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
+        Page<NewsArticle> page = newsArticleRepository.findByStatus(ArticleStatus.APPROVED, pageable);
         
         return newsArticleMapper.toSummaryDtoList(page.getContent());
     }
@@ -117,7 +93,7 @@ public class NewsArticleServiceImpl implements NewsArticleService {
         log.info("Getting trending {} news articles", limit);
         
         Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "viewCount"));
-        Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
+        Page<NewsArticle> page = newsArticleRepository.findByStatus(ArticleStatus.APPROVED, pageable);
         
         return newsArticleMapper.toSummaryDtoList(page.getContent());
     }
@@ -125,11 +101,9 @@ public class NewsArticleServiceImpl implements NewsArticleService {
     @Override
     public Optional<NewsArticleSummaryResponse> getFeaturedArticle() {
         log.info("Getting featured article");
-        
-        // Featured article logic: Most viewed recent article (within last 7 days)
-        // You can customize this logic based on your business requirements
+
         Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "viewCount"));
-        Page<NewsArticle> page = newsArticleRepository.findAll(pageable);
+        Page<NewsArticle> page = newsArticleRepository.findByStatus(ArticleStatus.APPROVED, pageable);
         
         if (page.hasContent()) {
             NewsArticle featuredArticle = page.getContent().get(0);

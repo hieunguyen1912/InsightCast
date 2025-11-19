@@ -31,5 +31,8 @@ public class CreateArticleRequest {
     private Long categoryId;
     
     private String featuredImage;
+    
+    @Size(max = 2000, message = "Summary must not exceed 2000 characters")
+    private String summary;
 }
 

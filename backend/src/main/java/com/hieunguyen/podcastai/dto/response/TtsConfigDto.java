@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -21,11 +20,9 @@ public class TtsConfigDto {
     private String voiceName;
     private Double speakingRate;
     private Double pitch;
-    private Double volumeGainDb;
+    private Double volumeGain;
     private String audioEncoding;
     private Integer sampleRateHertz;
-    private Boolean isDefault;
-    private Boolean isActive;
     private Instant createdAt;
     private Instant updatedAt;
     private Long userId;

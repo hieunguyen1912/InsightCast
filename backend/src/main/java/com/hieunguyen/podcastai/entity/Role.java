@@ -1,6 +1,5 @@
 package com.hieunguyen.podcastai.entity;
 
-import com.hieunguyen.podcastai.entity.base.AuditableEntity;
 import com.hieunguyen.podcastai.entity.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;

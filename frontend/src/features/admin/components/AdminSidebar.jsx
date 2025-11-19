@@ -6,12 +6,12 @@
 import React from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { 
-  LayoutDashboard, 
   FolderTree,
   Users,
   Shield,
   FileText,
-  ChevronRight
+  ChevronRight,
+  BarChart3
 } from 'lucide-react';
 
 /**
@@ -27,14 +27,14 @@ function AdminSidebar({ activeModule, onModuleChange, stats = {} }) {
   // Sidebar modules configuration
   const modules = [
     {
-      id: 'overview',
-      name: 'Overview',
-      icon: LayoutDashboard,
+      id: 'stats',
+      name: 'Statistics',
+      icon: BarChart3,
       count: null
     },
     {
-      id: 'articles',
-      name: 'Article Approval',
+      id: 'all-articles',
+      name: 'Articles',
       icon: FileText,
       count: stats.pendingArticles || 0
     },
@@ -113,37 +113,6 @@ function AdminSidebar({ activeModule, onModuleChange, stats = {} }) {
           })}
         </ul>
       </nav>
-
-      {/* Quick Stats */}
-      <div className="px-6 py-4 border-t border-gray-200 mt-auto">
-        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4">
-          <p className="text-xs text-red-800 font-medium mb-3">System Overview</p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-red-700">Pending Articles</span>
-              <span className="text-sm font-bold text-red-900">{stats.pendingArticles || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-red-700">Total Users</span>
-              <span className="text-sm font-bold text-red-900">{stats.totalUsers || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-red-700">Total Roles</span>
-              <span className="text-sm font-bold text-red-900">{stats.totalRoles || 0}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Help Section */}
-      <div className="px-6 py-4 border-t border-gray-200">
-        <div className="bg-blue-50 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">Admin Guidelines</h3>
-          <p className="text-xs text-blue-700 mb-3">
-            Manage users, roles, permissions, and approve articles from moderators.
-          </p>
-        </div>
-      </div>
     </aside>
   );
 }

@@ -29,7 +29,7 @@ const adminService = {
         }, {})
       ).toString();
 
-      const url = `${API_ENDPOINTS.ADMIN.PENDING_ARTICLES}?${queryString}`;
+      const url = `${API_ENDPOINTS.ADMIN.ARTICLES.PENDING_REVIEW}?${queryString}`;
       const response = await apiClient.get(url);
       
       return {
@@ -60,7 +60,7 @@ const adminService = {
         };
       }
 
-      const response = await apiClient.post(API_ENDPOINTS.ADMIN.APPROVE_ARTICLE(id));
+      const response = await apiClient.post(API_ENDPOINTS.ADMIN.ARTICLES.APPROVE(id));
       
       return {
         success: true,
@@ -108,7 +108,7 @@ const adminService = {
         rejectionReason: rejectionReason.trim()
       };
       
-      const response = await apiClient.post(API_ENDPOINTS.ADMIN.REJECT_ARTICLE(id), payload);
+      const response = await apiClient.post(API_ENDPOINTS.ADMIN.ARTICLES.REJECT(id), payload);
       
       return {
         success: true,
@@ -132,7 +132,394 @@ const adminService = {
     }
   },
 
+  // ========== Admin Articles Management ==========
 
+  /**
+   * Get all articles with filters
+   * @param {Object} params - Query parameters
+   * @param {number} params.page - Page number (default: 0)
+   * @param {number} params.size - Page size (default: 10)
+   * @param {string} params.sortBy - Sort field (default: 'createdAt')
+   * @param {string} params.sortDirection - Sort direction: 'asc' or 'desc' (default: 'desc')
+   * @param {string} params.status - Filter by status: 'DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED'
+   * @param {string} params.categoryName - Filter by category name (partial match)
+   * @param {string} params.authorName - Filter by author username (partial match)
+   * @returns {Promise<Object>} API response
+   */
+  async getAllArticles(params = {}) {
+    try {
+      const queryParams = {
+        page: params.page !== undefined ? params.page : 0,
+        size: params.size !== undefined ? params.size : 10,
+        sortBy: params.sortBy || 'createdAt',
+        sortDirection: params.sortDirection || 'desc'
+      };
+
+      // Add optional filters
+      if (params.status) queryParams.status = params.status;
+      if (params.categoryName) queryParams.categoryName = params.categoryName;
+      if (params.authorName) queryParams.authorName = params.authorName;
+
+      const queryString = new URLSearchParams(
+        Object.entries(queryParams).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {})
+      ).toString();
+
+      const url = `${API_ENDPOINTS.ADMIN.ARTICLES.ALL}?${queryString}`;
+      const response = await apiClient.get(url);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching all articles:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch articles',
+        data: { content: [], totalElements: 0, totalPages: 0 }
+      };
+    }
+  },
+
+  /**
+   * Get article by ID
+   * @param {string|number} id - Article ID
+   * @returns {Promise<Object>} API response
+   */
+  async getArticleById(id) {
+    try {
+      if (!id) {
+        return {
+          success: false,
+          error: 'Article ID is required'
+        };
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.ADMIN.ARTICLES.BY_ID(id));
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching article:', error);
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'Article not found'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch article'
+      };
+    }
+  },
+
+  /**
+   * Get approved articles
+   * @param {Object} params - Query parameters (page, size, sortBy, sortDirection)
+   * @returns {Promise<Object>} API response
+   */
+  async getApprovedArticles(params = {}) {
+    try {
+      const queryParams = {
+        page: params.page !== undefined ? params.page : 0,
+        size: params.size !== undefined ? params.size : 10,
+        sortBy: params.sortBy || 'publishedAt',
+        sortDirection: params.sortDirection || 'desc'
+      };
+
+      const queryString = new URLSearchParams(
+        Object.entries(queryParams).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {})
+      ).toString();
+
+      const url = `${API_ENDPOINTS.ADMIN.ARTICLES.APPROVED}?${queryString}`;
+      const response = await apiClient.get(url);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching approved articles:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch approved articles',
+        data: { content: [], totalElements: 0, totalPages: 0 }
+      };
+    }
+  },
+
+  /**
+   * Get rejected articles
+   * @param {Object} params - Query parameters (page, size, sortBy, sortDirection)
+   * @returns {Promise<Object>} API response
+   */
+  async getRejectedArticles(params = {}) {
+    try {
+      const queryParams = {
+        page: params.page !== undefined ? params.page : 0,
+        size: params.size !== undefined ? params.size : 10,
+        sortBy: params.sortBy || 'updatedAt',
+        sortDirection: params.sortDirection || 'desc'
+      };
+
+      const queryString = new URLSearchParams(
+        Object.entries(queryParams).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {})
+      ).toString();
+
+      const url = `${API_ENDPOINTS.ADMIN.ARTICLES.REJECTED}?${queryString}`;
+      const response = await apiClient.get(url);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching rejected articles:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch rejected articles',
+        data: { content: [], totalElements: 0, totalPages: 0 }
+      };
+    }
+  },
+
+  /**
+   * Get draft articles
+   * @param {Object} params - Query parameters (page, size, sortBy, sortDirection)
+   * @returns {Promise<Object>} API response
+   */
+  async getDraftArticles(params = {}) {
+    try {
+      const queryParams = {
+        page: params.page !== undefined ? params.page : 0,
+        size: params.size !== undefined ? params.size : 10,
+        sortBy: params.sortBy || 'updatedAt',
+        sortDirection: params.sortDirection || 'desc'
+      };
+
+      const queryString = new URLSearchParams(
+        Object.entries(queryParams).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined) {
+            acc[key] = String(value);
+          }
+          return acc;
+        }, {})
+      ).toString();
+
+      const url = `${API_ENDPOINTS.ADMIN.ARTICLES.DRAFTS}?${queryString}`;
+      const response = await apiClient.get(url);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching draft articles:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch draft articles',
+        data: { content: [], totalElements: 0, totalPages: 0 }
+      };
+    }
+  },
+
+  /**
+   * Update article
+   * @param {string|number} id - Article ID
+   * @param {Object} data - Article data to update
+   * @param {string} data.title - Article title (optional, 10-255 chars)
+   * @param {string} data.description - Description (optional, max 500 chars)
+   * @param {string} data.content - Content HTML (optional, min 100 chars)
+   * @param {number} data.categoryId - Category ID (optional)
+   * @param {string} data.summary - Summary (optional, max 2000 chars)
+   * @param {string} data.featuredImage - Featured image URL (optional)
+   * @param {File} featuredImageFile - Featured image file for upload (optional)
+   * @returns {Promise<Object>} API response
+   */
+  async updateArticle(id, data = {}, featuredImageFile = null) {
+    try {
+      if (!id) {
+        return {
+          success: false,
+          error: 'Article ID is required'
+        };
+      }
+
+      // Validate title if provided
+      if (data.title !== undefined && data.title !== null) {
+        if (data.title.trim().length < 10) {
+          return {
+            success: false,
+            error: 'Title must be at least 10 characters'
+          };
+        }
+        if (data.title.length > 255) {
+          return {
+            success: false,
+            error: 'Title must not exceed 255 characters'
+          };
+        }
+        data.title = data.title.trim();
+      }
+
+      // Validate description if provided
+      if (data.description !== undefined && data.description !== null) {
+        if (data.description.length > 500) {
+          return {
+            success: false,
+            error: 'Description must not exceed 500 characters'
+          };
+        }
+        data.description = data.description.trim() || null;
+      }
+
+      // Validate content if provided
+      if (data.content !== undefined && data.content !== null) {
+        if (data.content.trim().length < 100) {
+          return {
+            success: false,
+            error: 'Content must be at least 100 characters'
+          };
+        }
+        data.content = data.content.trim();
+      }
+
+      // Validate summary if provided
+      if (data.summary !== undefined && data.summary !== null) {
+        if (data.summary.length > 2000) {
+          return {
+            success: false,
+            error: 'Summary must not exceed 2000 characters'
+          };
+        }
+        data.summary = data.summary.trim() || null;
+      }
+
+      // If featuredImageFile is provided, use multipart/form-data
+      if (featuredImageFile) {
+        const formData = new FormData();
+        formData.append('data', JSON.stringify(data));
+        formData.append('featuredImage', featuredImageFile);
+        
+        const response = await apiClient.put(
+          API_ENDPOINTS.ADMIN.ARTICLES.UPDATE(id),
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          }
+        );
+        
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        // Use JSON request
+        const response = await apiClient.put(
+          API_ENDPOINTS.ADMIN.ARTICLES.UPDATE(id),
+          data
+        );
+        
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+    } catch (error) {
+      console.error('Error updating article:', error);
+      
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: error.response?.data?.message || 'Validation failed'
+        };
+      }
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'Article or category not found'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to update article'
+      };
+    }
+  },
+
+  /**
+   * Delete article
+   * @param {string|number} id - Article ID
+   * @returns {Promise<Object>} API response
+   */
+  async deleteArticle(id) {
+    try {
+      if (!id) {
+        return {
+          success: false,
+          error: 'Article ID is required'
+        };
+      }
+
+      const response = await apiClient.delete(API_ENDPOINTS.ADMIN.ARTICLES.DELETE(id));
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error deleting article:', error);
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'Article not found'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to delete article'
+      };
+    }
+  },
+
+  /**
+   * Get all users with pagination, sorting and filtering
+   * @param {Object} params - Query parameters
+   * @param {number} params.page - Page number (default: 0)
+   * @param {number} params.size - Page size (default: 10)
+   * @param {string} params.sortBy - Sort field: 'id', 'username', 'email', 'firstName', 'lastName', 'createdAt', 'updatedAt' (default: 'createdAt')
+   * @param {string} params.sortDirection - Sort direction: 'asc' or 'desc' (default: 'desc')
+   * @param {string} params.status - Filter by status: 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'DELETED'
+   * @param {string} params.email - Search email (contains, case-insensitive)
+   * @param {string} params.username - Search username (contains, case-insensitive)
+   * @returns {Promise<Object>} API response
+   */
   async getUsers(params = {}) {
     try {
       const queryParams = {
@@ -142,9 +529,14 @@ const adminService = {
         sortDirection: params.sortDirection || 'desc'
       };
 
+      // Add optional filters
+      if (params.status) queryParams.status = params.status;
+      if (params.email) queryParams.email = params.email;
+      if (params.username) queryParams.username = params.username;
+
       const queryString = new URLSearchParams(
         Object.entries(queryParams).reduce((acc, [key, value]) => {
-          if (value !== null && value !== undefined) {
+          if (value !== null && value !== undefined && value !== '') {
             acc[key] = String(value);
           }
           return acc;
@@ -1248,6 +1640,232 @@ const adminService = {
         success: false,
         error: error.response?.data?.message || error.message || 'Failed to fetch statistics',
         data: {}
+      };
+    }
+  },
+
+  // ========== Test Endpoints ==========
+
+  /**
+   * Test Firebase Cloud Messaging notification
+   * @param {string} token - FCM token (required)
+   * @param {string} title - Notification title (optional, default: "Test Notification")
+   * @param {string} body - Notification body (optional, default: "This is a test notification")
+   * @returns {Promise<Object>} API response
+   */
+  async testFcmSend(token, title, body) {
+    try {
+      if (!token) {
+        return {
+          success: false,
+          error: 'FCM token is required'
+        };
+      }
+
+      const queryParams = {
+        token: token.trim()
+      };
+
+      // Add optional parameters if provided
+      if (title !== undefined && title !== null) {
+        queryParams.title = title.trim();
+      }
+
+      if (body !== undefined && body !== null) {
+        queryParams.body = body.trim();
+      }
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const url = `${API_ENDPOINTS.TEST.FCM_SEND}?${queryString}`;
+      
+      const response = await apiClient.get(url);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error sending FCM test notification:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to send FCM test notification'
+      };
+    }
+  },
+
+  // ========== Statistics ==========
+
+  /**
+   * Get dashboard statistics
+   * @returns {Promise<Object>} API response
+   */
+  async getDashboardStats() {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.ADMIN.STATS.DASHBOARD);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch dashboard stats',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get article statistics
+   * @param {Object} params - Query parameters (fromDate, toDate)
+   * @returns {Promise<Object>} API response
+   */
+  async getArticleStats(params = {}) {
+    try {
+      const queryParams = {};
+      if (params.fromDate) queryParams.fromDate = params.fromDate;
+      if (params.toDate) queryParams.toDate = params.toDate;
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const url = queryString 
+        ? `${API_ENDPOINTS.ADMIN.STATS.ARTICLES}?${queryString}`
+        : API_ENDPOINTS.ADMIN.STATS.ARTICLES;
+
+      const response = await apiClient.get(url);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching article stats:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch article stats',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get user statistics
+   * @returns {Promise<Object>} API response
+   */
+  async getUserStats() {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.ADMIN.STATS.USERS);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch user stats',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get pending review statistics
+   * @returns {Promise<Object>} API response
+   */
+  async getPendingReviewStats() {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.ADMIN.STATS.PENDING_REVIEW);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching pending review stats:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch pending review stats',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get article trends
+   * @param {Object} params - Query parameters (days)
+   * @returns {Promise<Object>} API response
+   */
+  async getArticleTrends(params = {}) {
+    try {
+      const queryParams = {};
+      if (params.days) queryParams.days = params.days;
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const url = queryString 
+        ? `${API_ENDPOINTS.ADMIN.STATS.TRENDS}?${queryString}`
+        : API_ENDPOINTS.ADMIN.STATS.TRENDS;
+
+      const response = await apiClient.get(url);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching article trends:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch article trends',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get top authors
+   * @param {Object} params - Query parameters (limit)
+   * @returns {Promise<Object>} API response
+   */
+  async getTopAuthors(params = {}) {
+    try {
+      const queryParams = {};
+      if (params.limit) queryParams.limit = params.limit;
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const url = queryString 
+        ? `${API_ENDPOINTS.ADMIN.STATS.TOP_AUTHORS}?${queryString}`
+        : API_ENDPOINTS.ADMIN.STATS.TOP_AUTHORS;
+
+      const response = await apiClient.get(url);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching top authors:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch top authors',
+        data: null
+      };
+    }
+  },
+
+  /**
+   * Get engagement statistics
+   * @returns {Promise<Object>} API response
+   */
+  async getEngagementStats() {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.ADMIN.STATS.ENGAGEMENT);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Error fetching engagement stats:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch engagement stats',
+        data: null
       };
     }
   }

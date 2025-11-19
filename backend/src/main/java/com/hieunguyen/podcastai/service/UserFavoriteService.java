@@ -1,13 +1,12 @@
 package com.hieunguyen.podcastai.service;
 
-import com.hieunguyen.podcastai.dto.request.user.UserFavoriteRequest;
 import com.hieunguyen.podcastai.dto.response.UserFavoriteDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
-import java.util.List;
 
 public interface UserFavoriteService {
-    List<UserFavoriteDto> getUserFavorites();
-    UserFavoriteDto addFavorite(UserFavoriteRequest request);
+    Page<UserFavoriteDto> getUserFavorites(Pageable pageable);
+    UserFavoriteDto addFavorite(Long articleId);
     void removeFavorite(Long favoriteId);
-    void removeFavoriteByItem(Long itemId, com.hieunguyen.podcastai.enums.FavoriteType type);
 }

@@ -1,5 +1,7 @@
 package com.hieunguyen.podcastai.repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,10 +20,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByUsername(String username);
     
     Optional<User> findByEmail(String email);
-    
-    Optional<User> findByUsername(String username);
-    
-    Optional<User> findByEmailOrUsername(String email, String username);
 
     @Query("""
         SELECT u FROM User u
@@ -37,5 +35,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         WHERE u.id = :id
     """)
     Optional<User> findByIdWithDefaultTtsConfig(@Param("id") Long id);
+
+
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
+    List<User> findUsersByRole(@Param("roleName") String roleName);
+    
+    // Stats queries
+    long countByStatus(com.hieunguyen.podcastai.enums.UserStatus status);
+    
+    long countByCreatedAtBetween(Instant start, Instant end);
 
 }

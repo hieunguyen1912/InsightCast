@@ -37,5 +37,7 @@ public class AdminUserUpdateRequest {
     private LocalDate dateOfBirth;
     
     private String avatarUrl;
+    
+    private Long version;
 }
 

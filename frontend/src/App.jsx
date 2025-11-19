@@ -6,9 +6,11 @@
 import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './routes/ProtectedRoute';
+import RoleProtectedRoute from './routes/RoleProtectedRoute';
 import { routes } from './routes/index.js';
 import { navigationService } from './services/navigationService';
 import './index.css';
@@ -47,6 +49,26 @@ function AppContent() {
             {routes.map(route => {
               const RouteComponent = route.element;
               
+              // Route được bảo vệ theo role
+              if (route.protected && route.requiredRoles) {
+                return (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={
+                      <RoleProtectedRoute
+                        requiredRoles={route.requiredRoles}
+                        requiredPermissions={route.requiredPermissions}
+                        redirectTo={route.redirectTo || '/'}
+                      >
+                        <RouteComponent />
+                      </RoleProtectedRoute>
+                    }
+                  />
+                );
+              }
+              
+              // Route chỉ yêu cầu authentication
               if (route.protected) {
                 return (
                   <Route
@@ -61,6 +83,7 @@ function AppContent() {
                 );
               }
               
+              // Public route
               return (
                 <Route
                   key={route.path}
@@ -81,9 +104,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <NotificationProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -7,32 +7,51 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import DashboardSidebar from '../components/DashboardSidebar';
-import DashboardOverview from '../components/DashboardOverview';
 import ProfileModule from '../components/ProfileModule';
 import PodcastManagement from '../components/PodcastManagement';
-import SettingsModule from '../components/SettingsModule';
+import FavoritesModule from '../components/FavoritesModule';
+import TtsConfigManagement from '../components/TtsConfigManagement';
+import NotificationModule from '../../notification/components/NotificationModule';
 
 function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
-  const [activeModule, setActiveModule] = useState('overview');
+  
+  // Dashboard modules configuration
+  const modules = {
+    profile: ProfileModule,
+    podcasts: PodcastManagement,
+    favorites: FavoritesModule,
+    notifications: NotificationModule,
+    'tts-configs': TtsConfigManagement
+  };
 
-  // Set active module based on URL path
+  const [activeModule, setActiveModule] = useState('podcasts');
+
+  // Set active module based on URL path or search params
   useEffect(() => {
     if (location.pathname === '/me') {
       setActiveModule('profile');
     } else {
-      setActiveModule('overview');
+      const params = new URLSearchParams(location.search);
+      const module = params.get('module');
+      // Redirect settings to podcasts if settings module is removed
+      if (module === 'settings') {
+        setActiveModule('podcasts');
+      } else if (module && modules[module]) {
+        setActiveModule(module);
+      } else {
+        setActiveModule('podcasts');
+      }
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
-  // Dashboard modules configuration
-  const modules = {
-    overview: DashboardOverview,
-    profile: ProfileModule,
-    podcasts: PodcastManagement,
-    settings: SettingsModule
-  };
+  // Redirect if activeModule is settings (fallback)
+  useEffect(() => {
+    if (activeModule === 'settings') {
+      setActiveModule('podcasts');
+    }
+  }, [activeModule]);
 
   const ActiveComponent = modules[activeModule];
 
@@ -68,10 +87,11 @@ function DashboardPage() {
         <main className="flex-1 p-4 md:p-8 overflow-y-auto" role="main">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 pb-4 border-b border-gray-200 gap-4">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 m-0">
-              {activeModule === 'overview' && 'Overview'}
               {activeModule === 'profile' && 'Profile'}
               {activeModule === 'podcasts' && 'My Podcasts'}
-              {activeModule === 'settings' && 'Settings'}
+              {activeModule === 'favorites' && 'My Favorites'}
+              {activeModule === 'notifications' && 'Notifications'}
+              {activeModule === 'tts-configs' && 'TTS Configurations'}
             </h1>
             <div className="flex gap-4">
               {/* Quick actions can be added here */}

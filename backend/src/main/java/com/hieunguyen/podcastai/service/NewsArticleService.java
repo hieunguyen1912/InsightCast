@@ -13,7 +13,6 @@ import com.hieunguyen.podcastai.dto.response.NewsArticleSummaryResponse;
 
 public interface NewsArticleService {
 
-    Page<NewsArticleResponse> searchNewsBySpecification(Pageable pageable, String... search);
     Page<NewsArticleResponse> searchFullText(
             String keyword,
             Long categoryId,

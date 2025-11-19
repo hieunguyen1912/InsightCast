@@ -23,6 +23,7 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(1019, "Email already exists", HttpStatus.BAD_REQUEST),
     INVALID_PASSWORD(1020, "Invalid current password", HttpStatus.BAD_REQUEST),
     PASSWORD_MISMATCH(1021, "Password confirmation does not match", HttpStatus.BAD_REQUEST),
+    CONCURRENT_UPDATE(1022, "Data has been modified by another user. Please refresh and try again.", HttpStatus.CONFLICT),
     
     // TTS Config Error Codes
     TTS_CONFIG_NOT_FOUND(2001, "TTS configuration not found", HttpStatus.NOT_FOUND),
@@ -50,7 +51,11 @@ public enum ErrorCode {
     ARTICLE_CANNOT_BE_SUBMITTED(7004, "Article can only be submitted when in DRAFT status", HttpStatus.BAD_REQUEST),
     ARTICLE_CANNOT_BE_APPROVED(7006, "Article can only be approved when in PENDING_REVIEW status", HttpStatus.BAD_REQUEST),
     ARTICLE_CANNOT_BE_REJECTED(7007, "Article can only be rejected when in PENDING_REVIEW status", HttpStatus.BAD_REQUEST),
+    SUMMARY_NOT_AVAILABLE(7008, "Article summary is not available. Please generate summary first", HttpStatus.BAD_REQUEST),
     FORBIDDEN(7005, "You don't have permission to access this resource", HttpStatus.FORBIDDEN),
+    
+    // Comment Error Codes
+    MAX_COMMENT_DEPTH_EXCEEDED(7501, "Cannot reply to a reply. Maximum depth is 2 levels (top-level comment and one level of replies).", HttpStatus.BAD_REQUEST),
     
     // Image Error Codes
     IMAGE_NOT_FOUND(8001, "Image not found", HttpStatus.NOT_FOUND),

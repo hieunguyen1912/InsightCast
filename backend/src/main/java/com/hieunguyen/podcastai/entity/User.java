@@ -68,7 +68,7 @@ public class User extends AuditableEntity {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
     
-    @ManyToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "default_tts_config_id")
     private TtsConfig defaultTtsConfig;
     

@@ -17,10 +17,9 @@ public interface UserService {
    void changePassword(PasswordChangeRequest request);
    UserDto uploadAvatar(AvatarUploadRequest request);
    void deleteAccount();
-   Page<UserDto> searchUserBySpecification(Pageable pageable, String ...search);
-   
+
    // Admin methods
-   Page<UserDto> getAllUsers(Pageable pageable);
+   Page<UserDto> getAllUsers(Pageable pageable, com.hieunguyen.podcastai.enums.UserStatus status, String email, String username);
    UserDto updateUserByAdmin(Long userId, AdminUserUpdateRequest request);
    UserDto updateUserStatus(Long userId, UserStatusUpdateRequest request);
    void deleteUserByAdmin(Long userId);

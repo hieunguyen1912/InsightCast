@@ -8,7 +8,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 
@@ -18,6 +22,8 @@ import org.springframework.stereotype.Component;
 public class SecurityUtils {
 
     private final UserRepository userRepository;
+    private final UserDetailsService userDetailsService;
+    private final JwtDecoder jwtDecoder;
 
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -85,6 +91,24 @@ public class SecurityUtils {
         try {
             return getCurrentUser();
         } catch (AppException e) {
+            return null;
+        }
+    }
+
+    public Authentication getAuthenticationFromToken(String token) {
+        try {
+            Jwt jwt = jwtDecoder.decode(token);
+            String email = jwt.getClaimAsString("email");
+            
+            if (email == null) {
+                log.warn("JWT token does not contain email claim");
+                return null;
+            }
+            
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            return new JwtAuthenticationToken(jwt, userDetails.getAuthorities(), email);
+        } catch (Exception e) {
+            log.warn("Failed to decode JWT token or load user: {}", e.getMessage());
             return null;
         }
     }

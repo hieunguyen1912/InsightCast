@@ -23,9 +23,6 @@ public class TtsConfigController {
 
     private final TtsConfigService ttsConfigService;
 
-    /**
-     * Create a new TTS configuration
-     */
     @PostMapping
     public ResponseEntity<ApiResponse<TtsConfigDto>> createTtsConfig(@Valid @RequestBody TtsConfigRequest request) {
         log.info("Creating TTS configuration with name: {}", request.getName());
@@ -34,6 +31,7 @@ public class TtsConfigController {
         
         ApiResponse<TtsConfigDto> response = ApiResponse.<TtsConfigDto>builder()
                 .code(2000)
+                .status(200)
                 .message("TTS configuration created successfully")
                 .data(ttsConfig)
                 .build();
@@ -41,14 +39,14 @@ public class TtsConfigController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<TtsConfigDto>> getTtsConfigById(@PathVariable Long id) {
-        log.info("Retrieving TTS configuration with ID: {}", id);
-        
-        TtsConfigDto ttsConfig = ttsConfigService.getTtsConfigById(id);
+    @GetMapping
+    public ResponseEntity<ApiResponse<TtsConfigDto>> getTtsConfigByUser() {
+
+        TtsConfigDto ttsConfig = ttsConfigService.getTtsConfigByUser();
         
         ApiResponse<TtsConfigDto> response = ApiResponse.<TtsConfigDto>builder()
                 .code(2000)
+                .status(200)
                 .message("TTS configuration retrieved successfully")
                 .data(ttsConfig)
                 .build();
@@ -56,9 +54,6 @@ public class TtsConfigController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Update TTS configuration by ID
-     */
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<TtsConfigDto>> updateTtsConfig(
             @PathVariable Long id, 
@@ -69,6 +64,7 @@ public class TtsConfigController {
         
         ApiResponse<TtsConfigDto> response = ApiResponse.<TtsConfigDto>builder()
                 .code(2000)
+                .status(200)
                 .message("TTS configuration updated successfully")
                 .data(ttsConfig)
                 .build();
@@ -76,9 +72,6 @@ public class TtsConfigController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Delete TTS configuration by ID
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteTtsConfig(@PathVariable Long id) {
         log.info("Deleting TTS configuration with ID: {}", id);
@@ -87,11 +80,10 @@ public class TtsConfigController {
         
         ApiResponse<Void> response = ApiResponse.<Void>builder()
                 .code(2000)
+                .status(200)
                 .message("TTS configuration deleted successfully")
                 .build();
         
         return ResponseEntity.ok(response);
     }
-
-   
 }

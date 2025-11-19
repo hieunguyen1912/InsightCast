@@ -6,11 +6,12 @@
 import React from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { 
-  LayoutDashboard, 
   User, 
   Headphones, 
-  Settings,
-  ChevronRight 
+  ChevronRight,
+  Volume2,
+  Bookmark,
+  Bell
 } from 'lucide-react';
 
 function DashboardSidebar({ activeModule, onModuleChange }) {
@@ -18,11 +19,6 @@ function DashboardSidebar({ activeModule, onModuleChange }) {
 
   // Dashboard modules configuration
   const modules = [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: LayoutDashboard
-    },
     {
       id: 'profile',
       name: 'Profile',
@@ -34,9 +30,19 @@ function DashboardSidebar({ activeModule, onModuleChange }) {
       icon: Headphones
     },
     {
-      id: 'settings',
-      name: 'Settings',
-      icon: Settings
+      id: 'favorites',
+      name: 'Favorites',
+      icon: Bookmark
+    },
+    {
+      id: 'notifications',
+      name: 'Notifications',
+      icon: Bell
+    },
+    {
+      id: 'tts-configs',
+      name: 'TTS Configurations',
+      icon: Volume2
     }
   ];
 
@@ -79,17 +85,6 @@ function DashboardSidebar({ activeModule, onModuleChange }) {
           })}
         </ul>
       </nav>
-
-      {/* Quick Stats (Optional) */}
-      <div className="px-6 py-4 border-t border-gray-200 mt-auto">
-        <div className="bg-gray-50 rounded-lg p-4">
-          <p className="text-xs text-gray-600 font-medium mb-2">Quick Stats</p>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-bold text-gray-900">0</span>
-            <span className="text-sm text-gray-600">Podcasts</span>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

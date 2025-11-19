@@ -4,25 +4,28 @@
  * - Categories
  * - Role Permissions
  * - Users
- * - Article Approval (moderator articles)
+ * - Articles (all articles with tabs: All, Approved, Rejected, Drafts, Pending Review)
  */
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useRole } from '../../../hooks/useRole';
 import AdminSidebar from '../components/AdminSidebar';
-import AdminOverview from '../components/AdminOverview';
+import AdminStats from '../components/AdminStats';
 import CategoryManagement from '../components/CategoryManagement';
 import UserManagement from '../components/UserManagement';
 import RolePermissionManagement from '../components/RolePermissionManagement';
-import ArticleApprovalManagement from '../components/ArticleApprovalManagement';
+import AdminArticlesManagement from '../components/AdminArticlesManagement';
 import adminService from '../api';
 
 function AdminPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAdmin } = useRole();
   
-  const [activeModule, setActiveModule] = useState('overview');
+  const [activeModule, setActiveModule] = useState('stats');
   const [stats, setStats] = useState({
     pendingArticles: 0,
     totalUsers: 0,
@@ -38,42 +41,44 @@ function AdminPage() {
       return;
     }
 
-    // TODO: Add proper role check when user object includes roles
-    // For now, we assume authenticated users can access admin page
-    // In production, you should check: user.roles?.includes('ADMIN')
+    // Kiểm tra quyền ADMIN - nếu không có quyền sẽ bị RoleProtectedRoute redirect
+    if (!isAdmin) {
+      navigate('/');
+      return;
+    }
     
     loadStats();
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isAdmin, navigate]);
+
+  // Handle query params to set active module
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const module = params.get('module');
+    if (module && ['stats', 'categories', 'users', 'roles', 'all-articles'].includes(module)) {
+      setActiveModule(module);
+    }
+  }, [location.search]);
 
   // Load statistics
   const loadStats = async () => {
     setLoading(true);
     
     try {
-      // Load admin statistics
-      const statsResult = await adminService.getStats();
+      // Load dashboard stats
+      const dashboardResult = await adminService.getDashboardStats();
       
-      if (statsResult.success) {
-        setStats({
-          pendingArticles: statsResult.data.pendingArticles || 0,
-          totalUsers: statsResult.data.totalUsers || 0,
-          totalRoles: statsResult.data.totalRoles || 0,
-          totalCategories: statsResult.data.totalCategories || 0
-        });
-      } else {
-        // Fallback: try to load individual stats
-        const [pendingResult, usersResult] = await Promise.all([
-          adminService.getPendingArticles({ page: 0, size: 1 }),
-          adminService.getUsers({ page: 0, size: 1 })
-        ]);
+      // Fallback: try to load individual stats
+      const [pendingResult, usersResult] = await Promise.all([
+        adminService.getPendingArticles({ page: 0, size: 1 }),
+        adminService.getUsers({ page: 0, size: 1 })
+      ]);
 
-        setStats({
-          pendingArticles: pendingResult.success ? (pendingResult.data?.totalElements || 0) : 0,
-          totalUsers: usersResult.success ? (usersResult.data?.totalElements || 0) : 0,
-          totalRoles: 0,
-          totalCategories: 0
-        });
-      }
+      setStats({
+        pendingArticles: pendingResult.success ? (pendingResult.data?.totalElements || 0) : 0,
+        totalUsers: usersResult.success ? (usersResult.data?.totalElements || 0) : 0,
+        totalRoles: 0,
+        totalCategories: 0
+      });
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -88,13 +93,8 @@ function AdminPage() {
   // Render active module content
   const renderContent = () => {
     switch (activeModule) {
-      case 'overview':
-        return (
-          <AdminOverview 
-            stats={stats}
-            onNavigate={handleModuleChange}
-          />
-        );
+      case 'stats':
+        return <AdminStats />;
       
       case 'categories':
         return (
@@ -117,33 +117,28 @@ function AdminPage() {
           />
         );
       
-      case 'articles':
+      case 'all-articles':
         return (
-          <ArticleApprovalManagement 
+          <AdminArticlesManagement 
             onStatsChange={loadStats}
           />
         );
       
       default:
-        return (
-          <AdminOverview 
-            stats={stats}
-            onNavigate={handleModuleChange}
-          />
-        );
+        return <AdminStats />;
     }
   };
 
   const getPageTitle = () => {
     const titles = {
-      overview: 'Admin Dashboard',
+      stats: 'Statistics',
       categories: 'Category Management',
       users: 'User Management',
       roles: 'Role & Permission Management',
-      articles: 'Article Approval'
+      'all-articles': 'Articles Management'
     };
     
-    return titles[activeModule] || 'Admin Dashboard';
+    return titles[activeModule] || 'Statistics';
   };
 
   if (!isAuthenticated) {
@@ -184,7 +179,7 @@ function AdminPage() {
           </div>
           
           <div className="animate-fade-in">
-            {loading && activeModule === 'overview' ? (
+            {loading && activeModule === 'stats' ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
               </div>

@@ -32,4 +32,5 @@ public class UserDto {
     private Boolean emailVerified;
     private Instant createdAt;
     private Instant updatedAt;
+    private Long version;
 }

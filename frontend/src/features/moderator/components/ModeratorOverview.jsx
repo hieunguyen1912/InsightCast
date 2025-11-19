@@ -188,29 +188,6 @@ function ModeratorOverview({ stats = {}, onNavigate }) {
           </div>
         </div>
       </div>
-
-      {/* Tips Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-bold text-blue-900 mb-3">💡 Tips for Better Articles</h3>
-        <ul className="space-y-2 text-sm text-blue-800">
-          <li className="flex items-start">
-            <span className="mr-2">•</span>
-            <span>Write compelling headlines that grab attention (minimum 10 characters)</span>
-          </li>
-          <li className="flex items-start">
-            <span className="mr-2">•</span>
-            <span>Include relevant images to make your articles more engaging</span>
-          </li>
-          <li className="flex items-start">
-            <span className="mr-2">•</span>
-            <span>Provide clear and detailed content (minimum 100 characters)</span>
-          </li>
-          <li className="flex items-start">
-            <span className="mr-2">•</span>
-            <span>Submit articles for review when they're ready for publication</span>
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }

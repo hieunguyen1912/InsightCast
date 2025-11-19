@@ -14,5 +14,5 @@ import java.util.Optional;
 public interface TtsConfigRepository extends JpaRepository<TtsConfig, Long> {
 
     boolean existsByUserAndName(User user, String name);
-    Optional<TtsConfig> findByIdAndUser(Long id, User user);
+    Optional<TtsConfig> findByUser(User user);
 }

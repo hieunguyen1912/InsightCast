@@ -29,10 +29,25 @@ export const API_ENDPOINTS = {
   USER: {
     FAVORITES: '/favorites',
     FAVORITE_BY_ID: (id) => `/favorites/${id}`,
+    // Article favorites endpoints
+    ARTICLE_FAVORITES: '/user/me/favorites',
+    ADD_ARTICLE_FAVORITE: (articleId) => `/user/me/favorites/${articleId}`,
+    REMOVE_ARTICLE_FAVORITE: (favoriteId) => `/user/me/favorites/${favoriteId}`,
     PLAYLISTS: '/playlists',
     PLAYLIST_BY_ID: (id) => `/playlists/${id}`,
     HISTORY: '/history',
-    SUBSCRIPTIONS: '/subscriptions'
+    SUBSCRIPTIONS: '/subscriptions',
+    AUDIO: '/user/audio',
+    // FCM Token Management
+    REGISTER_FCM_TOKEN: '/user/me/fcm-tokens',
+    REMOVE_FCM_TOKEN: (token) => `/user/me/fcm-tokens/${token}`,
+    // Notification endpoints
+    NOTIFICATIONS: '/user/me/notifications',
+    NOTIFICATION_UNREAD_COUNT: '/user/me/notifications/unread-count',
+    NOTIFICATION_MARK_READ: (id) => `/user/me/notifications/${id}/read`,
+    NOTIFICATION_MARK_ALL_READ: '/user/me/notifications/read-all',
+    NOTIFICATION_DELETE: (id) => `/user/me/notifications/${id}`,
+    NOTIFICATION_DELETE_READ: '/user/me/notifications/read'
   },
 
   // AI endpoints
@@ -88,10 +103,14 @@ export const API_ENDPOINTS = {
     MY_REJECTED: '/articles/my-rejected',
     MY_ALL: '/articles/my-all',
     GENERATE_AUDIO: (id) => `/articles/${id}/generate-audio`,
+    GENERATE_AUDIO_FROM_SUMMARY: (id) => `/articles/${id}/generate-audio-from-summary`,
+    GET_AUDIO_FILES: (articleId) => `/articles/${articleId}/audio`,
     CHECK_AUDIO_STATUS: (audioFileId) => `/articles/audio/${audioFileId}/check-status`,
     STREAM_AUDIO: (audioFileId) => `/articles/audio/${audioFileId}/stream`,
     DOWNLOAD_AUDIO: (audioFileId) => `/articles/audio/${audioFileId}/download`,
-    CANCEL_AUDIO: (audioFileId) => `/articles/audio/${audioFileId}/cancel`
+    DELETE_AUDIO: (audioFileId) => `/articles/audio/${audioFileId}`,
+    CANCEL_AUDIO: (audioFileId) => `/articles/audio/${audioFileId}/cancel`,
+    GENERATE_SUMMARY: '/articles/generate-summary'
   },
 
   // Public article endpoints (for displaying articles to users)
@@ -101,16 +120,25 @@ export const API_ENDPOINTS = {
     LATEST: '/news/latest',
     BY_ID: (id) => `/news/${id}`,
     SEARCH: '/news/search',
-    CATEGORIES: '/news/categories',
+    BY_CATEGORY: (categoryId) => `/news/category/${categoryId}`,
     RELATED: (id) => `/news/${id}/related`
   },
 
   // Admin endpoints
   ADMIN: {
-    // Article approval
-    PENDING_ARTICLES: '/admin/articles/pending-review',
-    APPROVE_ARTICLE: (id) => `/admin/articles/${id}/approve`,
-    REJECT_ARTICLE: (id) => `/admin/articles/${id}/reject`,
+    // Article management
+    ARTICLES: {
+      ALL: '/admin/articles/all',
+      BY_ID: (id) => `/admin/articles/${id}`,
+      APPROVED: '/admin/articles/approved',
+      REJECTED: '/admin/articles/rejected',
+      DRAFTS: '/admin/articles/drafts',
+      PENDING_REVIEW: '/admin/articles/pending-review',
+      APPROVE: (id) => `/admin/articles/${id}/approve`,
+      REJECT: (id) => `/admin/articles/${id}/reject`,
+      UPDATE: (id) => `/admin/articles/${id}`,
+      DELETE: (id) => `/admin/articles/${id}`
+    },
     
     // User management
     USERS: '/admin/users',
@@ -141,7 +169,37 @@ export const API_ENDPOINTS = {
     REVOKE_PERMISSION: (roleId, permissionId) => `/roles/${roleId}/permissions/${permissionId}`,
     
     // Statistics
-    STATS: '/admin/stats'
+    STATS: {
+      DASHBOARD: '/admin/stats/dashboard',
+      ARTICLES: '/admin/stats/articles',
+      USERS: '/admin/stats/users',
+      PENDING_REVIEW: '/admin/stats/articles/pending-review',
+      TRENDS: '/admin/stats/articles/trends',
+      TOP_AUTHORS: '/admin/stats/top-authors',
+      ENGAGEMENT: '/admin/stats/engagement'
+    }
+  },
+
+  // TTS Configuration endpoints
+  TTS_CONFIG: {
+    CREATE: '/tts-configs',
+    GET_USER: '/tts-configs',
+    UPDATE: (id) => `/tts-configs/${id}`,
+    DELETE: (id) => `/tts-configs/${id}`
+  },
+
+  // Comment endpoints
+  COMMENTS: {
+    CREATE: (articleId) => `/comments/articles/${articleId}`,
+    GET_BY_ARTICLE: (articleId) => `/comments/articles/${articleId}`,
+    UPDATE: (articleId, commentId) => `/comments/articles/${articleId}/comments/${commentId}`,
+    DELETE: (articleId, commentId) => `/comments/articles/${articleId}/comments/${commentId}`,
+    GET_REPLIES: (commentId) => `/comments/${commentId}/replies`
+  },
+
+  // Test endpoints
+  TEST: {
+    FCM_SEND: '/test/fcm/send'
   }
 };
 

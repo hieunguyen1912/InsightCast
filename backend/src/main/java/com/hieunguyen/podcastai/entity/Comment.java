@@ -1,20 +1,19 @@
 package com.hieunguyen.podcastai.entity;
 
 import com.hieunguyen.podcastai.entity.base.BaseEntity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
 @AllArgsConstructor
 @Builder
+@NoArgsConstructor
 @Table(name = "comments")
+@Entity
 public class Comment extends BaseEntity {
     private String content;
 
@@ -23,6 +22,13 @@ public class Comment extends BaseEntity {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "article_id")
+    @JoinColumn(name = "article_id", nullable = false)
     private NewsArticle article;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Comment parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Comment> replies = new ArrayList<>();
 }

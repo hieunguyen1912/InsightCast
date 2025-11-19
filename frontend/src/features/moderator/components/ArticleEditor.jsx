@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
-import { Save, Send, X, Image as ImageIcon, Upload, FolderTree } from 'lucide-react';
+import { Save, Send, X, Image as ImageIcon, Upload, FolderTree, Sparkles } from 'lucide-react';
 import { Button, Input, Textarea, Alert } from '../../../components/common';
 import articleService from '../api';
 import categoryService from '../../category/api';
@@ -12,6 +12,7 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    summary: '',
     content: '',
     featuredImage: '',
     categoryId: ''
@@ -19,30 +20,103 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
   
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSummaryConfigModalOpen, setIsSummaryConfigModalOpen] = useState(false);
+  const [summaryConfig, setSummaryConfig] = useState({
+    maxLength: 200,
+    language: 'vi'
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
   const [featuredImageFile, setFeaturedImageFile] = useState(null); // Store file for multipart upload
+  const [contentImageUrls, setContentImageUrls] = useState([]); // Store content image URLs
   const quillRef = useRef(null);
+
+  // Helper function to convert relative image URLs to absolute URLs
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    
+    // If already absolute URL (http/https/blob), return as is
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    
+    // If relative URL, prepend base URL
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+    // Remove /api/v1 if present in baseURL since relative URLs might already include it
+    const cleanBaseURL = baseURL.replace(/\/api\/v1$/, '');
+    
+    // Ensure URL starts with /
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    
+    return `${cleanBaseURL}${cleanUrl}`;
+  };
+
+  // Helper function to convert image URLs in content to absolute URLs
+  const processContentImageUrls = (content) => {
+    if (!content) return content;
+    
+    // Match all img tags with src attribute
+    const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+    
+    return content.replace(imgRegex, (match, src) => {
+      // If already absolute URL (http/https/blob/data), keep as is
+      if (src.startsWith('http://') || src.startsWith('https://') || 
+          src.startsWith('blob:') || src.startsWith('data:')) {
+        return match;
+      }
+      
+      // Convert relative URL to absolute
+      const absoluteUrl = getImageUrl(src);
+      return match.replace(src, absoluteUrl);
+    });
+  };
 
   // Load article data if editing
   useEffect(() => {
     if (article) {
       const categoryId = article.categoryId || article.category?.id || '';
+      
+      // Process content to ensure images are displayed correctly
+      let processedContent = article.content || '';
+      
+      // If content has placeholders and we have contentImageUrls, replace them
+      if (article.contentImageUrls && Array.isArray(article.contentImageUrls) && article.contentImageUrls.length > 0) {
+        setContentImageUrls(article.contentImageUrls);
+        
+        // Replace placeholders with actual URLs if content has placeholders
+        article.contentImageUrls.forEach((url, index) => {
+          const placeholder = `__IMAGE_PLACEHOLDER_${index}__`;
+          if (processedContent.includes(placeholder)) {
+            processedContent = processedContent.replace(placeholder, url);
+          }
+        });
+      } else {
+        setContentImageUrls([]);
+      }
+      
+      // Convert all image URLs in content to absolute URLs for proper display in editor
+      processedContent = processContentImageUrls(processedContent);
+      
       setFormData({
         title: article.title || '',
         description: article.description || '',
-        content: article.content || '',
+        summary: article.summary || '',
+        content: processedContent,
         featuredImage: article.featuredImage || '',
-          categoryId: categoryId
+        categoryId: categoryId
       });
 
       // Load category info if categoryId exists
       if (categoryId) {
         loadCategoryInfo(categoryId);
       }
+    } else {
+      // Reset contentImageUrls when creating new article
+      setContentImageUrls([]);
     }
   }, [article]);
 
@@ -92,7 +166,7 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     setIsCategoryModalOpen(false);
   };
 
-  // Image handler for Quill editor - Upload from local
+  // Image handler for Quill editor - Upload to server immediately
   const imageHandler = () => {
     const editor = quillRef.current?.getEditor();
     if (!editor) return;
@@ -106,9 +180,9 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
       const file = input.files[0];
       
       if (file) {
-        // Check file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          setError('Image size must be less than 5MB');
+        // Check file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          setError('Image size must be less than 10MB');
           return;
         }
         
@@ -198,6 +272,79 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     if (success) setSuccess(null);
   };
 
+  // Convert base64 data URL to File object
+  const base64ToFile = (base64String, filename = 'image.png') => {
+    try {
+      const arr = base64String.split(',');
+      if (arr.length !== 2) {
+        throw new Error('Invalid base64 string');
+      }
+      
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch) {
+        throw new Error('Invalid mime type');
+      }
+      
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      
+      // Generate filename with extension based on mime type
+      const extension = mime.split('/')[1] || 'png';
+      const finalFilename = filename.includes('.') ? filename : `${filename}.${extension}`;
+      
+      return new File([u8arr], finalFilename, { type: mime });
+    } catch (err) {
+      console.error('Error converting base64 to file:', err);
+      return null;
+    }
+  };
+
+  // Extract base64 images from content and convert to File objects
+  const extractContentImages = (content) => {
+    if (!content) return { files: [], updatedContent: content };
+    
+    const base64Regex = /src=["'](data:image\/([^;]+);base64,([^"']+))["']/g;
+    const matches = [...content.matchAll(base64Regex)];
+    
+    if (matches.length === 0) {
+      return { files: [], updatedContent: content };
+    }
+    
+    const files = [];
+    const placeholders = new Map(); // Map base64 -> placeholder
+    
+    matches.forEach((match, index) => {
+      const fullBase64 = match[1]; // data:image/png;base64,...
+      const imageType = match[2]; // png, jpeg, etc.
+      const base64Data = match[3]; // actual base64 data
+      
+      // Convert to File
+      const file = base64ToFile(fullBase64, `content-image-${index + 1}.${imageType}`);
+      
+      if (file) {
+        files.push(file);
+        // Create placeholder that will be replaced by backend with actual URL
+        // Backend should return image URLs in the same order
+        placeholders.set(fullBase64, `__IMAGE_PLACEHOLDER_${index}__`);
+      }
+    });
+    
+    // Replace base64 with placeholders temporarily
+    // Backend will replace these with actual URLs
+    let updatedContent = content;
+    placeholders.forEach((placeholder, base64) => {
+      updatedContent = updatedContent.replace(base64, placeholder);
+    });
+    
+    return { files, updatedContent, placeholders };
+  };
+
   const validateForm = () => {
     // Mark all fields as touched when validation is attempted
     setTouchedFields({
@@ -261,17 +408,23 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     setSuccess(null);
     
     try {
+      // Extract base64 images from content
+      const { files: contentImageFiles, updatedContent, placeholders } = extractContentImages(formData.content);
+      
       // Prepare payload according to API spec
       // Support both JSON and Multipart upload
       const payload = {
         title: formData.title.trim(),
-        content: formData.content,
+        content: updatedContent, // Content with placeholders
         categoryId: Number(formData.categoryId)
       };
 
       // Add optional fields only if they have values
       if (formData.description && formData.description.trim()) {
         payload.description = formData.description.trim();
+      }
+      if (formData.summary && formData.summary.trim()) {
+        payload.summary = formData.summary.trim();
       }
 
       // If we have a file to upload, use it for multipart
@@ -280,6 +433,11 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
         payload.featuredImageFile = featuredImageFile;
       } else if (formData.featuredImage && formData.featuredImage.trim()) {
         payload.featuredImage = formData.featuredImage.trim();
+      }
+
+      // Add content images if any
+      if (contentImageFiles.length > 0) {
+        payload.contentImages = contentImageFiles;
       }
 
       let result;
@@ -293,6 +451,26 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
       }
       
       if (result.success) {
+        // Replace placeholders with actual URLs from backend response
+        let finalContent = updatedContent;
+        if (result.data?.contentImageUrls && Array.isArray(result.data.contentImageUrls)) {
+          result.data.contentImageUrls.forEach((url, index) => {
+            const placeholder = `__IMAGE_PLACEHOLDER_${index}__`;
+            finalContent = finalContent.replace(placeholder, url);
+          });
+        }
+        
+        // Update content with actual URLs
+        setFormData(prev => ({
+          ...prev,
+          content: finalContent
+        }));
+        
+        // Update contentImageUrls from response
+        if (result.data?.contentImageUrls && Array.isArray(result.data.contentImageUrls)) {
+          setContentImageUrls(result.data.contentImageUrls);
+        }
+        
         // If we uploaded a file, update featuredImage URL from response
         if (featuredImageFile && result.data?.featuredImage) {
           // Cleanup old blob URL if it was a preview
@@ -338,19 +516,23 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     setSuccess(null);
     
     try {
-      let savedArticle = article;
+      // Extract base64 images from content
+      const { files: contentImageFiles, updatedContent, placeholders } = extractContentImages(formData.content);
       
       // Prepare payload according to API spec
       // Support both JSON and Multipart upload
       const payload = {
         title: formData.title.trim(),
-        content: formData.content,
+        content: updatedContent, // Content with placeholders
         categoryId: Number(formData.categoryId)
       };
 
       // Add optional fields only if they have values
       if (formData.description && formData.description.trim()) {
         payload.description = formData.description.trim();
+      }
+      if (formData.summary && formData.summary.trim()) {
+        payload.summary = formData.summary.trim();
       }
 
       // If we have a file to upload, use it for multipart
@@ -361,6 +543,13 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
         payload.featuredImage = formData.featuredImage.trim();
       }
 
+      // Add content images if any
+      if (contentImageFiles.length > 0) {
+        payload.contentImages = contentImageFiles;
+      }
+
+      let savedArticle = article;
+      
       // If new article or has changes, save first
       if (!article?.id) {
         // Create new article (supports JSON or Multipart)
@@ -382,6 +571,26 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
         }
         
         savedArticle = updateResult.data;
+      }
+      
+      // Replace placeholders with actual URLs from backend response
+      let finalContent = updatedContent;
+      if (savedArticle?.contentImageUrls && Array.isArray(savedArticle.contentImageUrls)) {
+        savedArticle.contentImageUrls.forEach((url, index) => {
+          const placeholder = `__IMAGE_PLACEHOLDER_${index}__`;
+          finalContent = finalContent.replace(placeholder, url);
+        });
+      }
+      
+      // Update content with actual URLs
+      setFormData(prev => ({
+        ...prev,
+        content: finalContent
+      }));
+      
+      // Update contentImageUrls from response
+      if (savedArticle?.contentImageUrls && Array.isArray(savedArticle.contentImageUrls)) {
+        setContentImageUrls(savedArticle.contentImageUrls);
       }
       
       // Update featuredImage URL if we uploaded a file
@@ -426,27 +635,6 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     if (onCancel) {
       onCancel();
     }
-  };
-
-  // Helper function to convert relative image URLs to absolute URLs
-  // Note: Backend should have /api/v1/images/** in public endpoints for images to load
-  const getImageUrl = (url) => {
-    if (!url) return null;
-    
-    // If already absolute URL (http/https/blob), return as is
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
-      return url;
-    }
-    
-    // If relative URL, prepend base URL
-    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
-    // Remove /api/v1 if present in baseURL since relative URLs might already include it
-    const cleanBaseURL = baseURL.replace(/\/api\/v1$/, '');
-    
-    // Ensure URL starts with /
-    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-    
-    return `${cleanBaseURL}${cleanUrl}`;
   };
 
   // Handle image upload
@@ -512,6 +700,64 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
     }));
     setFeaturedImageFile(null);
     setSuccess('Image removed');
+  };
+
+  // Handle open generate summary config modal
+  const handleOpenGenerateSummary = () => {
+    // Check if content exists
+    const plainTextContent = formData.content.replace(/<[^>]*>/g, '').trim();
+    if (!plainTextContent || plainTextContent.length < 100) {
+      setError('Please add content (at least 100 characters) before generating summary');
+      return;
+    }
+
+    setError(null); // Clear any previous errors
+    setIsSummaryConfigModalOpen(true);
+  };
+
+  // Handle generate summary with config
+  const handleGenerateSummary = async () => {
+    // Validate maxLength
+    if (!summaryConfig.maxLength || summaryConfig.maxLength < 50 || summaryConfig.maxLength > 1000) {
+      setError('Max length must be between 50 and 1000 words');
+      // Keep modal open for user to fix
+      return;
+    }
+
+    // Validate language
+    if (!summaryConfig.language) {
+      setError('Please select a language');
+      // Keep modal open for user to fix
+      return;
+    }
+
+    setGeneratingSummary(true);
+    setError(null);
+    setSuccess(null);
+    setIsSummaryConfigModalOpen(false);
+
+    try {
+      const result = await articleService.generateSummary(
+        formData.content,
+        summaryConfig.maxLength,
+        summaryConfig.language
+      );
+
+      if (result.success) {
+        setFormData(prev => ({
+          ...prev,
+          summary: result.data || ''
+        }));
+        setSuccess('Summary generated successfully');
+      } else {
+        setError(result.error || 'Failed to generate summary');
+      }
+    } catch (err) {
+      console.error('Error generating summary:', err);
+      setError('An unexpected error occurred while generating summary');
+    } finally {
+      setGeneratingSummary(false);
+    }
   };
 
   return (
@@ -603,6 +849,112 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
           onSelect={handleCategorySelect}
         />
 
+        {/* Summary Generate Config Modal */}
+        {isSummaryConfigModalOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => {
+              if (!generatingSummary) {
+                setError(null);
+                setIsSummaryConfigModalOpen(false);
+              }
+            }}
+          >
+            <div 
+              className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-gray-200 px-6 py-4">
+                <h3 className="text-lg font-semibold text-gray-900">Generate Summary Configuration</h3>
+                <p className="text-sm text-gray-600 mt-1">Configure settings for AI summary generation</p>
+              </div>
+              
+              {error && (
+                <div className="mx-6 mt-4">
+                  <Alert variant="error" title="Error" dismissible onDismiss={() => setError(null)}>
+                    {error}
+                  </Alert>
+                </div>
+              )}
+              
+              <div className="px-6 py-4 space-y-4">
+                {/* Max Length */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Length (words) <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="number"
+                    min="50"
+                    max="1000"
+                    value={summaryConfig.maxLength}
+                    onChange={(e) => setSummaryConfig(prev => ({
+                      ...prev,
+                      maxLength: parseInt(e.target.value) || 200
+                    }))}
+                    placeholder="200"
+                    disabled={generatingSummary}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Maximum number of words in the summary (50-1000, default: 200)
+                  </p>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Language <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={summaryConfig.language}
+                    onChange={(e) => setSummaryConfig(prev => ({
+                      ...prev,
+                      language: e.target.value
+                    }))}
+                    disabled={generatingSummary}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="vi">Tiếng Việt (Vietnamese)</option>
+                    <option value="en">English</option>
+                    <option value="zh">中文 (Chinese)</option>
+                    <option value="ja">日本語 (Japanese)</option>
+                    <option value="ko">한국어 (Korean)</option>
+                    <option value="fr">Français (French)</option>
+                    <option value="de">Deutsch (German)</option>
+                    <option value="es">Español (Spanish)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Language for the generated summary
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setError(null);
+                    setIsSummaryConfigModalOpen(false);
+                  }}
+                  disabled={generatingSummary}
+                >
+                  <X className="h-5 w-5 mr-2" />
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleGenerateSummary}
+                  disabled={generatingSummary}
+                  isLoading={generatingSummary}
+                >
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  {generatingSummary ? 'Generating...' : 'Generate Summary'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Description */}
         <Textarea
           label="Description"
@@ -614,6 +966,39 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
           disabled={loading}
           helperText={`${formData.description.length}/500 characters`}
         />
+
+        {/* Summary */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Summary <span className="text-gray-500 text-xs">(optional)</span>
+            </label>
+            <Button
+              variant="secondary"
+              onClick={handleOpenGenerateSummary}
+              disabled={loading || generatingSummary || !formData.content}
+              isLoading={generatingSummary}
+              title="Generate summary using AI (Gemini)"
+              className="whitespace-nowrap"
+            >
+              <Sparkles className="h-5 w-5 mr-2" />
+              {generatingSummary ? 'Generating...' : 'Generate'}
+            </Button>
+          </div>
+          <Textarea
+            name="summary"
+            value={formData.summary}
+            onChange={handleChange}
+            placeholder="Article summary (you can write manually or generate automatically using AI)"
+            rows={6}
+            disabled={loading || generatingSummary}
+            helperText={`${formData.summary.length} characters`}
+            className="text-base"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Write a summary manually or click "Generate" to create one automatically from your content using AI
+          </p>
+        </div>
 
         {/* Featured Image */}
         <div>
@@ -693,6 +1078,11 @@ function ArticleEditor({ article = null, onSave, onCancel }) {
           </div>
           <p className="mt-2 text-sm text-gray-500">
             {formData.content.replace(/<[^>]*>/g, '').length} characters (min. 100 required)
+            {contentImageUrls && contentImageUrls.length > 0 && (
+              <span className="ml-2 text-gray-400">
+                • {contentImageUrls.length} image{contentImageUrls.length > 1 ? 's' : ''} embedded in content
+              </span>
+            )}
           </p>
         </div>
       </div>

@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, User, Eye, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import articleService from '../api';
+import adminService from '../../admin/api';
 import { formatNewsTime, formatDate } from '../../../utils/formatTime';
 
 /**
@@ -15,8 +16,9 @@ import { formatNewsTime, formatDate } from '../../../utils/formatTime';
  * @param {boolean} props.isOpen - Whether the modal is open
  * @param {Function} props.onClose - Callback when modal is closed
  * @param {Object|number} props.articleId - Article ID or article object
+ * @param {boolean} props.useAdminApi - Use admin API instead of moderator API (default: false)
  */
-function ArticleViewModal({ isOpen, onClose, articleId }) {
+function ArticleViewModal({ isOpen, onClose, articleId, useAdminApi = false }) {
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -43,7 +45,11 @@ function ArticleViewModal({ isOpen, onClose, articleId }) {
     setError(null);
     
     try {
-      const result = await articleService.getArticleById(id);
+      // Use admin API if useAdminApi prop is true, otherwise use moderator API
+      const result = useAdminApi 
+        ? await adminService.getArticleById(id)
+        : await articleService.getArticleById(id);
+      
       if (result.success) {
         setArticle(result.data);
       } else {
@@ -87,6 +93,39 @@ function ArticleViewModal({ isOpen, onClose, articleId }) {
     const cleanUrl = url.startsWith('/') ? url : `/${url}`;
     
     return `${cleanBaseURL}${cleanUrl}`;
+  };
+
+  // Helper function to process content and ensure images display correctly
+  const processContent = (content, contentImageUrls) => {
+    if (!content) return content;
+    
+    let processedContent = content;
+    
+    // Replace placeholders with actual URLs if content has placeholders
+    if (contentImageUrls && Array.isArray(contentImageUrls) && contentImageUrls.length > 0) {
+      contentImageUrls.forEach((url, index) => {
+        const placeholder = `__IMAGE_PLACEHOLDER_${index}__`;
+        if (processedContent.includes(placeholder)) {
+          processedContent = processedContent.replace(placeholder, url);
+        }
+      });
+    }
+    
+    // Convert all relative image URLs to absolute URLs
+    const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+    processedContent = processedContent.replace(imgRegex, (match, src) => {
+      // If already absolute URL (http/https/blob/data), keep as is
+      if (src.startsWith('http://') || src.startsWith('https://') || 
+          src.startsWith('blob:') || src.startsWith('data:')) {
+        return match;
+      }
+      
+      // Convert relative URL to absolute
+      const absoluteUrl = getImageUrl(src);
+      return match.replace(src, absoluteUrl);
+    });
+    
+    return processedContent;
   };
 
   const getStatusBadge = (status) => {
@@ -228,10 +267,13 @@ function ArticleViewModal({ isOpen, onClose, articleId }) {
                   {article.content ? (
                     <div 
                       dangerouslySetInnerHTML={{ 
-                        __html: DOMPurify.sanitize(article.content, {
-                          ADD_TAGS: ['iframe'],
-                          ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling']
-                        }) 
+                        __html: DOMPurify.sanitize(
+                          processContent(article.content, article.contentImageUrls), 
+                          {
+                            ADD_TAGS: ['iframe'],
+                            ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling']
+                          }
+                        ) 
                       }} 
                     />
                   ) : (

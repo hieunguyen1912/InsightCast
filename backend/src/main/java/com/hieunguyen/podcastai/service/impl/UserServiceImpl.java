@@ -14,6 +14,8 @@ import com.hieunguyen.podcastai.repository.UserRepository;
 import com.hieunguyen.podcastai.service.UserRoleService;
 import com.hieunguyen.podcastai.service.UserService;
 import com.hieunguyen.podcastai.specification.SpecificationsBuilder;
+import com.hieunguyen.podcastai.specification.SearchOperation;
+import org.springframework.data.jpa.domain.Specification;
 import com.hieunguyen.podcastai.util.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.OptimisticLockException;
 
 @Service
 @Slf4j
@@ -60,23 +63,29 @@ public class UserServiceImpl implements UserService{
     @Transactional
     public UserDto updateProfile(UserUpdateRequest request) {
         log.info("Updating user profile");
-        User currentUser = securityUtils.getCurrentUser();
+        Long userId = securityUtils.getCurrentUserId();
         
-        // Check if username is already taken by another user
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        if (request.getVersion() != null && !currentUser.getVersion().equals(request.getVersion())) {
+            log.warn("Version mismatch for user {}: expected {}, but got {}", 
+                    userId, request.getVersion(), currentUser.getVersion());
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
+        }
+        
         if (!currentUser.getUsername().equals(request.getUsername())) {
             if (userRepository.existsByUsername(request.getUsername())) {
                 throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
             }
         }
         
-        // Check if email is already taken by another user
         if (!currentUser.getEmail().equals(request.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {
                 throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
             }
         }
         
-        // Update user fields
         currentUser.setUsername(request.getUsername());
         currentUser.setEmail(request.getEmail());
         currentUser.setFirstName(request.getFirstName());
@@ -84,9 +93,14 @@ public class UserServiceImpl implements UserService{
         currentUser.setPhoneNumber(request.getPhoneNumber());
         currentUser.setDateOfBirth(request.getDateOfBirth());
         
-        User updatedUser = userRepository.save(currentUser);
-        log.info("Successfully updated user profile for user: {}", updatedUser.getEmail());
-        return userMapper.toDto(updatedUser);
+        try {
+            User updatedUser = userRepository.save(currentUser);
+            log.info("Successfully updated user profile for user: {}", updatedUser.getEmail());
+            return userMapper.toDto(updatedUser);
+        } catch (OptimisticLockException e) {
+            log.warn("Optimistic lock exception when updating user {}: {}", userId, e.getMessage());
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
+        }
     }
 
     @Override
@@ -137,37 +151,35 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public Page<UserDto> searchUserBySpecification(Pageable pageable, String ...search) {
-
+    public Page<UserDto> getAllUsers(Pageable pageable, com.hieunguyen.podcastai.enums.UserStatus status, String email, String username) {
+        log.info("Getting all users with filters - status: {}, email: {}, username: {}", status, email, username);
+        
         SpecificationsBuilder<User> builder = new SpecificationsBuilder<>();
-
-        if (search.length > 0) {
-            Pattern pattern = Pattern.compile("(\\w+)([<:>~!])(\\*?)([^*]*)(\\*?)");
-            for (String s : search) {
-                Matcher matcher = pattern.matcher(s);
-                if (matcher.find()) {
-                    String key = matcher.group(1);
-                    String operation = matcher.group(2);
-                    String prefix = matcher.group(3);
-                    String value = matcher.group(4);
-                    String suffix = matcher.group(5);
-
-                    builder.with(key, operation, value, prefix, suffix);
-                }
-            }
-
-            Page<User> users = userRepository.findAll(Objects.requireNonNull(builder.build()), pageable);
-
-            return users.map(userMapper::toDto);
+        
+        if (status != null) {
+            builder.with("status", ":", status, null, null);
         }
-        return userRepository.findAll(pageable).map(userMapper::toDto);
-    }
-
-    @Override
-    public Page<UserDto> getAllUsers(Pageable pageable) {
-        log.info("Getting all users with pagination");
-        Page<User> users = userRepository.findAll(pageable);
-        log.info("Found {} users", users.getTotalElements());
+        
+        if (email != null && !email.trim().isEmpty()) {
+            builder.with("email", ":", email.trim(), 
+                        SearchOperation.ZERO_OR_MORE_REGEX, 
+                        SearchOperation.ZERO_OR_MORE_REGEX);
+        }
+        
+        if (username != null && !username.trim().isEmpty()) {
+            builder.with("username", ":", username.trim(), 
+                        SearchOperation.ZERO_OR_MORE_REGEX, 
+                        SearchOperation.ZERO_OR_MORE_REGEX);
+        }
+        
+        Specification<User> spec = builder.build();
+        
+        if (spec == null) {
+            spec = (root, query, cb) -> cb.conjunction();
+        }
+        
+        Page<User> users = userRepository.findAll(spec, pageable);
+        log.info("Found {} users with filters", users.getTotalElements());
         return users.map(userMapper::toDto);
     }
 
@@ -178,7 +190,12 @@ public class UserServiceImpl implements UserService{
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         
-        // Check if username is already taken by another user
+        if (request.getVersion() != null && !user.getVersion().equals(request.getVersion())) {
+            log.warn("Version mismatch for user {}: expected {}, but got {}", 
+                    userId, request.getVersion(), user.getVersion());
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
+        }
+        
         if (request.getUsername() != null && !user.getUsername().equals(request.getUsername())) {
             if (userRepository.existsByUsername(request.getUsername())) {
                 throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
@@ -186,7 +203,6 @@ public class UserServiceImpl implements UserService{
             user.setUsername(request.getUsername());
         }
         
-        // Check if email is already taken by another user
         if (request.getEmail() != null && !user.getEmail().equals(request.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {
                 throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
@@ -194,7 +210,6 @@ public class UserServiceImpl implements UserService{
             user.setEmail(request.getEmail());
         }
         
-        // Update user fields (only if provided)
         if (request.getFirstName() != null) {
             user.setFirstName(request.getFirstName());
         }
@@ -211,9 +226,14 @@ public class UserServiceImpl implements UserService{
             user.setAvatarUrl(request.getAvatarUrl());
         }
         
-        User updatedUser = userRepository.save(user);
-        log.info("Successfully updated user with ID: {} by admin", userId);
-        return userMapper.toDto(updatedUser);
+        try {
+            User updatedUser = userRepository.save(user);
+            log.info("Successfully updated user with ID: {} by admin", userId);
+            return userMapper.toDto(updatedUser);
+        } catch (OptimisticLockException e) {
+            log.warn("Optimistic lock exception when updating user {}: {}", userId, e.getMessage());
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
+        }
     }
 
     @Override
@@ -236,7 +256,6 @@ public class UserServiceImpl implements UserService{
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         
-        // Soft delete by setting status to DELETED
         user.setStatus(com.hieunguyen.podcastai.enums.UserStatus.DELETED);
         userRepository.save(user);
         log.info("Successfully deleted user with ID: {} by admin", userId);

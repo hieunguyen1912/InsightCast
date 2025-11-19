@@ -2,6 +2,7 @@ package com.hieunguyen.podcastai.controller;
 
 import com.hieunguyen.podcastai.dto.request.AudioRequest;
 import com.hieunguyen.podcastai.dto.request.CreateArticleRequest;
+import com.hieunguyen.podcastai.dto.request.GenerateSummaryRequest;
 import com.hieunguyen.podcastai.dto.request.UpdateArticleRequest;
 import com.hieunguyen.podcastai.dto.response.ApiResponse;
 import com.hieunguyen.podcastai.dto.response.AudioFileDto;
@@ -27,6 +28,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/articles")
 @Slf4j
@@ -36,13 +39,24 @@ public class ArticleController {
     private final ArticleService articleService;
     private final ArticleToAudioService articleToAudioService;
 
+    @PostMapping("/generate-summary")
+    public ResponseEntity<ApiResponse<String>> generateSummary(
+            @Valid @RequestBody GenerateSummaryRequest request) {
+        log.info("Previewing summary for content length: {}", 
+                request.getMaxLength());
+        
+        String summary = articleService.generateSummary(request);
+        
+        return ResponseEntity.ok(ApiResponse.success("Summary generated successfully", summary));
+    }
+
     // Endpoint for JSON (backward compatible)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<NewsArticleResponse>> createArticleJson(
             @Valid @RequestBody CreateArticleRequest request) {
         log.info("Creating new article with title: {} (JSON)", request.getTitle());
 
-        NewsArticleResponse article = articleService.createArticle(request, null);
+        NewsArticleResponse article = articleService.createArticle(request, null, null);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Article created successfully", article));
@@ -52,10 +66,11 @@ public class ArticleController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<NewsArticleResponse>> createArticleMultipart(
             @RequestPart(value = "data") @Valid CreateArticleRequest request,
-            @RequestPart(value = "featuredImage", required = false) MultipartFile featuredImage) {
+            @RequestPart(value = "featuredImage", required = false) MultipartFile featuredImage,
+            @RequestPart(value = "contentImages", required = false) List<MultipartFile> contentImages) {
         log.info("Creating new article with title: {} (Multipart)", request.getTitle());
 
-        NewsArticleResponse article = articleService.createArticle(request, featuredImage);
+        NewsArticleResponse article = articleService.createArticle(request, featuredImage, contentImages);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Article created successfully", article));
@@ -273,9 +288,11 @@ public class ArticleController {
         }
     }
 
+
     @DeleteMapping("/audio/{audioFileId}")
     public ResponseEntity<ApiResponse<Void>> deleteAudioFile(@PathVariable Long audioFileId) {
         log.info("Deleting audio file: {}", audioFileId);
+        
         articleToAudioService.deleteAudioFile(audioFileId);
         return ResponseEntity.ok(ApiResponse.success("Audio file deleted successfully", null));
     }
@@ -300,6 +317,32 @@ public class ArticleController {
             log.error("Failed to download audio file {}: {}", audioFileId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @GetMapping("/{articleId}/audio")
+    public ResponseEntity<ApiResponse<List<AudioFileDto>>> getAudioByUserAndArticle(
+            @PathVariable Long articleId
+    ) {
+        List<AudioFileDto> response = articleToAudioService.getAudioFiles(articleId);
+
+        return ResponseEntity.ok(ApiResponse.success("Audio files retrieved successfully", response));
+    }
+
+    @PostMapping("/{id}/generate-audio-from-summary")
+    public ResponseEntity<ApiResponse<AudioFileDto>> generateAudioFromSummary(
+            @PathVariable Long id,
+            @RequestBody(required = false) @Valid AudioRequest request) {
+        
+        log.info("Generating audio from summary for article: {}", id);
+        
+        if (request == null) {
+            request = AudioRequest.builder().build();
+        }
+        
+        AudioFileDto audioFile = articleToAudioService.generateAudioFromSummary(id, request);
+    
+        return ResponseEntity.accepted()
+                .body(ApiResponse.success("Audio generation from summary started. Use check-status endpoint to track progress.", audioFile));
     }
 }
 

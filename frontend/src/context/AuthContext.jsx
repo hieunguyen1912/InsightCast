@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import { authService } from '../features/auth/api';
+import fcmTokenService from '../services/fcmTokenService';
 
 // Initial state
 const initialState = {
@@ -112,6 +113,9 @@ export function AuthProvider({ children }) {
             type: AUTH_ACTIONS.LOGIN_SUCCESS,
             payload: { user: profileResult.data }
           });
+          
+          // Register FCM token after successful authentication
+          registerFcmTokenSilently();
         } else {
           authService.clearAuth();
           dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
@@ -125,6 +129,42 @@ export function AuthProvider({ children }) {
 
     initializeAuth();
   }, []);
+
+  // Register FCM token silently (without blocking UI)
+  const registerFcmTokenSilently = async () => {
+    try {
+      // Check if browser supports notifications
+      if (!('Notification' in window)) {
+        console.log('Browser does not support notifications, skipping FCM token registration');
+        return;
+      }
+
+      // Request permission if not already granted/denied
+      if (Notification.permission === 'default') {
+        console.log('Requesting notification permission...');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          console.log('Notification permission not granted:', permission);
+          return;
+        }
+        console.log('Notification permission granted');
+      } else if (Notification.permission === 'denied') {
+        console.log('Notification permission is denied, skipping FCM token registration');
+        return;
+      }
+
+      // Permission is granted, register token
+      const result = await fcmTokenService.registerToken();
+      if (result.success) {
+        console.log('✅ FCM token registered successfully');
+      } else {
+        console.warn('❌ Failed to register FCM token:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error registering FCM token:', error);
+      // Don't throw - this is a background operation
+    }
+  };
 
   // Login function
   const login = async (credentials) => {
@@ -142,6 +182,10 @@ export function AuthProvider({ children }) {
             requiresEmailVerification: result.data.requiresEmailVerification
           }
         });
+        
+        // Register FCM token after successful login
+        registerFcmTokenSilently();
+        
         return { 
           success: true,
           requiresEmailVerification: result.data.requiresEmailVerification
@@ -196,6 +240,16 @@ export function AuthProvider({ children }) {
   // Logout function
   const logout = async () => {
     try {
+      // Remove FCM token before logout
+      // Get fresh token from Firebase (not from localStorage) to ensure we remove the correct token
+      // Backend is the source of truth, but we need the current token to remove it
+      try {
+        await fcmTokenService.removeToken(); // Will get fresh token from Firebase
+      } catch (error) {
+        console.warn('Failed to remove FCM token on logout:', error);
+        // Continue with logout even if token removal fails
+      }
+      
       await authService.logout();
     } catch (error) {
       console.error('Logout error:', error);
@@ -210,6 +264,7 @@ export function AuthProvider({ children }) {
       const result = await authService.updateProfile(profileData);
       
       if (result.success) {
+        // Use the user data from response (includes updated version from backend)
         dispatch({
           type: AUTH_ACTIONS.UPDATE_USER,
           payload: result.data

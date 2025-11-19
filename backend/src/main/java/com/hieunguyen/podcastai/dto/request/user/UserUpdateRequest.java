@@ -38,4 +38,6 @@ public class UserUpdateRequest {
     private String phoneNumber;
     
     private LocalDate dateOfBirth;
+    
+    private Long version;
 }

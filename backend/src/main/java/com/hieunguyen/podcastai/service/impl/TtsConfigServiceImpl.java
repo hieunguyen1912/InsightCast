@@ -41,6 +41,9 @@ public class TtsConfigServiceImpl implements TtsConfigService {
         
         TtsConfig ttsConfig = ttsConfigMapper.toEntity(request);
         ttsConfig.setUser(currentUser);
+        ttsConfig.setAudioEncoding("LINEAR16");
+
+        currentUser.setDefaultTtsConfig(ttsConfig);
         
         TtsConfig savedTtsConfig = ttsConfigRepository.save(ttsConfig);
         log.info("Successfully created TTS configuration with ID: {}", savedTtsConfig.getId());
@@ -51,11 +54,10 @@ public class TtsConfigServiceImpl implements TtsConfigService {
 
     @Override
     @Transactional(readOnly = true)
-    public TtsConfigDto getTtsConfigById(Long id) {
-        log.info("Retrieving TTS configuration with ID: {}", id);
-        
+    public TtsConfigDto getTtsConfigByUser() {
+
         User currentUser = securityUtils.getCurrentUser();
-        TtsConfig ttsConfig = ttsConfigRepository.findByIdAndUser(id, currentUser)
+        TtsConfig ttsConfig = ttsConfigRepository.findByUser(currentUser)
                 .orElseThrow(() -> new AppException(ErrorCode.TTS_CONFIG_NOT_FOUND));
         
         return ttsConfigMapper.toDto(ttsConfig);
@@ -102,7 +104,7 @@ public class TtsConfigServiceImpl implements TtsConfigService {
             throw new AppException(ErrorCode.TTS_CONFIG_ACCESS_DENIED);
         }
         
-        ttsConfigRepository.save(ttsConfig);
+        ttsConfigRepository.delete(ttsConfig);
         
         log.info("Successfully deleted TTS configuration with ID: {}", id);
     }

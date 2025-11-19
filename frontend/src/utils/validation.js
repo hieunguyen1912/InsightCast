@@ -14,6 +14,33 @@ export function isValidEmail(email) {
 }
 
 /**
+ * Validate username format
+ * @param {string} username - Username to validate
+ * @returns {Object} Validation result with isValid and message
+ */
+export function validateUsername(username) {
+  if (!username) {
+    return { isValid: false, message: 'Username is required' };
+  }
+  
+  if (username.length < 3) {
+    return { isValid: false, message: 'Username must be at least 3 characters' };
+  }
+  
+  if (username.length > 50) {
+    return { isValid: false, message: 'Username must not exceed 50 characters' };
+  }
+  
+  // Only letters, numbers, and underscores
+  const usernameRegex = /^[a-zA-Z0-9_]+$/;
+  if (!usernameRegex.test(username)) {
+    return { isValid: false, message: 'Username can only contain letters, numbers, and underscores' };
+  }
+  
+  return { isValid: true, message: 'Username is valid' };
+}
+
+/**
  * Validate password strength
  * @param {string} password - Password to validate
  * @returns {Object} Validation result with isValid and message
@@ -27,6 +54,10 @@ export function validatePassword(password) {
     return { isValid: false, message: 'Password must be at least 8 characters long' };
   }
   
+  if (password.length > 100) {
+    return { isValid: false, message: 'Password must not exceed 100 characters' };
+  }
+  
   if (!/(?=.*[a-z])/.test(password)) {
     return { isValid: false, message: 'Password must contain at least one lowercase letter' };
   }
@@ -37,6 +68,11 @@ export function validatePassword(password) {
   
   if (!/(?=.*\d)/.test(password)) {
     return { isValid: false, message: 'Password must contain at least one number' };
+  }
+  
+  // Check for special character
+  if (!/(?=.*[@$!%*?&])/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one special character (@$!%*?&)' };
   }
   
   return { isValid: true, message: 'Password is valid' };

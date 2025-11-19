@@ -7,6 +7,7 @@ const Register = lazy(() => import('../features/auth/pages/RegisterPage'));
 const Dashboard = lazy(() => import('../features/dashboard/pages/DashboardPage'));
 const Moderator = lazy(() => import('../features/moderator/pages/ModeratorPage'));
 const Admin = lazy(() => import('../features/admin/pages/AdminPage'));
+const AdminArticleEdit = lazy(() => import('../features/admin/pages/AdminArticleEditPage'));
 const Podcast = lazy(() => import('../features/podcast/pages/PodcastPage'));
 const ArticleDetail = lazy(() => import('../features/article/pages/ArticleDetailPage'));
 const CategoryPage = lazy(() => import('../pages/CategoryPage'));
@@ -41,12 +42,20 @@ export const routes = [
   {
     path: '/moderator',
     element: Moderator,
-    protected: true
+    protected: true,
+    requiredRoles: ['MODERATOR', 'ADMIN'] // MODERATOR hoặc ADMIN có thể truy cập
   },
   {
     path: '/admin',
     element: Admin,
-    protected: true
+    protected: true,
+    requiredRoles: ['ADMIN'] // Chỉ ADMIN có thể truy cập
+  },
+  {
+    path: '/admin/articles/:id/edit',
+    element: AdminArticleEdit,
+    protected: true,
+    requiredRoles: ['ADMIN'] // Chỉ ADMIN có thể truy cập
   },
   {
     path: '/podcast/:id',
